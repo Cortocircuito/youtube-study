@@ -1,0 +1,25 @@
+{
+  "videos": [
+    {
+      "id": "Yj51wXMwFwE",
+      "title": "ASÍ Controlo mis agentes de IA desde el TELÉFONO",
+      "channel": "Gentleman Programming",
+      "duration": 1530,
+      "url": "https://www.youtube.com/watch?v=Yj51wXMwFwE",
+      "path": "data/videos/Yj51wXMwFwE",
+      "tools": [
+        "tailscale",
+        "ssh",
+        "moshi",
+        "herdr",
+        "tmux",
+        "whisper",
+        "codex",
+        "openssh",
+        "ufw"
+      ],
+      "created_at": "2026-08-30T12:04:37+00:00",
+      "updated_at": "2026-08-30T12:04:37+00:00"
+    }
+  ]
+}

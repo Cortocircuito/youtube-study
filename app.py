@@ -25,6 +25,7 @@ from src.youtube_study.exporter import (
     write_tools,
     write_transcript,
 )
+from src.youtube_study.library import library_path_from_videos_dir, upsert_video
 from src.youtube_study.transcript import clean_vtt
 
 
@@ -52,6 +53,7 @@ def process_video(url: str, out: Path, langs: str) -> Path:
     write_questions(video_dir / "questions.md", qs)
     write_flashcards(video_dir / "flashcards.md", cards)
     write_study_guide(video_dir / "study-guide.md", title, tools, qs)
+    upsert_video(library_path_from_videos_dir(out), info, video_dir, tools)
     return video_dir
 
 
