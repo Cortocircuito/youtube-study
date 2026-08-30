@@ -36,6 +36,17 @@ def save_library(path: Path, data: dict[str, Any]) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def list_videos(path: Path) -> list[dict[str, Any]]:
+    return load_library(path).get("videos", [])
+
+
+def get_video(path: Path, video_id: str) -> dict[str, Any] | None:
+    for video in list_videos(path):
+        if video.get("id") == video_id:
+            return video
+    return None
+
+
 def upsert_video(path: Path, info: dict[str, Any], video_dir: Path, tools: list[ToolMention]) -> dict[str, Any]:
     """Insert or update one video in the local library, deduplicated by id."""
     data = load_library(path)

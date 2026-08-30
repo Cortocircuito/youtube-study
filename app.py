@@ -25,8 +25,54 @@ from src.youtube_study.exporter import (
     write_tools,
     write_transcript,
 )
-from src.youtube_study.library import library_path_from_videos_dir, upsert_video
+from src.youtube_study.library import get_video, library_path_from_videos_dir, list_videos, upsert_video
 from src.youtube_study.transcript import clean_vtt
+
+
+def format_duration(seconds: int | None) -> str:
+    if not seconds:
+        return "N/D"
+    h = seconds // 3600
+    m = (seconds % 3600) // 60
+    s = seconds % 60
+    if h:
+        return f"{h}:{m:02d}:{s:02d}"
+    return f"{m}:{s:02d}"
+
+
+def print_video_list(videos_dir: Path) -> None:
+    videos = list_videos(library_path_from_videos_dir(videos_dir))
+    if not videos:
+        print("La biblioteca está vacía. Analiza un video con: python app.py URL")
+        return
+    for video in videos:
+        tools = ", ".join(video.get("tools") or []) or "sin herramientas"
+        print(f"{video.get('id')} | {format_duration(video.get('duration'))} | {video.get('title')}")
+        print(f"  Canal: {video.get('channel') or 'N/D'}")
+        print(f"  Herramientas: {tools}")
+        print(f"  Ruta: {video.get('path')}")
+
+
+def print_video_detail(videos_dir: Path, video_id: str) -> None:
+    video = get_video(library_path_from_videos_dir(videos_dir), video_id)
+    if not video:
+        print(f"No existe el video {video_id} en la biblioteca.")
+        return
+    print(f"ID: {video.get('id')}")
+    print(f"Título: {video.get('title')}")
+    print(f"Canal: {video.get('channel') or 'N/D'}")
+    print(f"Duración: {format_duration(video.get('duration'))}")
+    print(f"URL: {video.get('url') or 'N/D'}")
+    print(f"Ruta: {video.get('path')}")
+    print(f"Herramientas: {', '.join(video.get('tools') or []) or 'N/D'}")
+    print(f"Creado: {video.get('created_at')}")
+    print(f"Actualizado: {video.get('updated_at')}")
+
+    video_dir = Path(video.get("path") or videos_dir / video_id)
+    if video_dir.exists():
+        print("\nArchivos disponibles:")
+        for path in sorted(p for p in video_dir.iterdir() if p.is_file()):
+            print(f"- {path.name}")
 
 
 def process_video(url: str, out: Path, langs: str) -> Path:
@@ -70,16 +116,26 @@ def main() -> None:
     study.add_argument("--lang", default="es-419,es,es-orig")
     study.add_argument("--out", default="data/videos")
 
+    list_cmd = sub.add_parser("list", help="Listar videos guardados")
+    list_cmd.add_argument("--out", default="data/videos")
+
+    show = sub.add_parser("show", help="Mostrar detalle de un video guardado")
+    show.add_argument("video_id")
+    show.add_argument("--out", default="data/videos")
+
     args = parser.parse_args(argv)
     if args.command == "study":
         video_dir = process_video(args.url, Path(args.out), args.lang)
+        print("\nArchivos generados:")
+        for path in sorted(video_dir.iterdir()):
+            print(f"- {path}")
+    elif args.command == "list":
+        print_video_list(Path(args.out))
+    elif args.command == "show":
+        print_video_detail(Path(args.out), args.video_id)
     else:
         parser.print_help()
         return
-
-    print("\nArchivos generados:")
-    for path in sorted(video_dir.iterdir()):
-        print(f"- {path}")
 
 
 if __name__ == "__main__":
