@@ -26,6 +26,7 @@ from src.youtube_study.exporter import (
     write_transcript,
 )
 from src.youtube_study.library import get_video, library_path_from_videos_dir, list_videos, upsert_video
+from src.youtube_study.search import SearchResult, search_library
 from src.youtube_study.transcript import clean_vtt
 
 
@@ -73,6 +74,23 @@ def print_video_detail(videos_dir: Path, video_id: str) -> None:
         print("\nArchivos disponibles:")
         for path in sorted(p for p in video_dir.iterdir() if p.is_file()):
             print(f"- {path.name}")
+
+
+def print_search_results(results: list[SearchResult]) -> None:
+    if not results:
+        print("No se encontraron resultados.")
+        return
+    for result in results:
+        location = f"{result.video_id}"
+        if result.timestamp:
+            location += f" [{result.timestamp}]"
+        print(f"{location} | {result.title}")
+        for line in result.context_before:
+            print(f"  {line}")
+        print(f"  > {result.line}")
+        for line in result.context_after:
+            print(f"  {line}")
+        print()
 
 
 def process_video(url: str, out: Path, langs: str) -> Path:
@@ -123,6 +141,13 @@ def main() -> None:
     show.add_argument("video_id")
     show.add_argument("--out", default="data/videos")
 
+    search = sub.add_parser("search", help="Buscar texto dentro de transcripciones")
+    search.add_argument("query")
+    search.add_argument("--video", dest="video_id")
+    search.add_argument("--limit", type=int, default=10)
+    search.add_argument("--context", type=int, default=0)
+    search.add_argument("--out", default="data/videos")
+
     args = parser.parse_args(argv)
     if args.command == "study":
         video_dir = process_video(args.url, Path(args.out), args.lang)
@@ -133,6 +158,11 @@ def main() -> None:
         print_video_list(Path(args.out))
     elif args.command == "show":
         print_video_detail(Path(args.out), args.video_id)
+    elif args.command == "search":
+        videos_dir = Path(args.out)
+        videos = list_videos(library_path_from_videos_dir(videos_dir))
+        results = search_library(videos, args.query, video_id=args.video_id, limit=args.limit, context=args.context)
+        print_search_results(results)
     else:
         parser.print_help()
         return
