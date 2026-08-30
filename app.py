@@ -5,6 +5,8 @@ import argparse
 import sys
 from pathlib import Path
 
+import json
+
 from src.youtube_study.analyzer import (
     detect_tools,
     flashcards,
@@ -93,11 +95,8 @@ def print_search_results(results: list[SearchResult]) -> None:
         print()
 
 
-def process_video(url: str, out: Path, langs: str) -> Path:
-    info = download_subtitles(url, out, langs)
+def generate_study_files(info: dict, video_dir: Path, subtitle: Path, library_path: Path) -> Path:
     video_id = info["id"]
-    video_dir = out / video_id
-    subtitle = choose_vtt(video_dir, video_id, [x.strip() for x in langs.split(",") if x.strip()])
     cues = clean_vtt(subtitle)
     text = full_text(cues)
 
@@ -117,8 +116,31 @@ def process_video(url: str, out: Path, langs: str) -> Path:
     write_questions(video_dir / "questions.md", qs)
     write_flashcards(video_dir / "flashcards.md", cards)
     write_study_guide(video_dir / "study-guide.md", title, tools, qs)
-    upsert_video(library_path_from_videos_dir(out), info, video_dir, tools)
+    upsert_video(library_path, info, video_dir, tools)
     return video_dir
+
+
+def process_video(url: str, out: Path, langs: str) -> Path:
+    info = download_subtitles(url, out, langs)
+    video_id = info["id"]
+    video_dir = out / video_id
+    subtitle = choose_vtt(video_dir, video_id, [x.strip() for x in langs.split(",") if x.strip()])
+    return generate_study_files(info, video_dir, subtitle, library_path_from_videos_dir(out))
+
+
+def analyze_existing(video_id: str, out: Path, langs: str) -> Path:
+    video_dir = out / video_id
+    if not video_dir.exists():
+        raise FileNotFoundError(f"No existe el directorio del video: {video_dir}")
+
+    info_path = video_dir / "info.json"
+    if not info_path.exists():
+        raise FileNotFoundError(f"No existe info.json para {video_id}: {info_path}")
+    info = json.loads(info_path.read_text(encoding="utf-8"))
+    info.setdefault("id", video_id)
+
+    subtitle = choose_vtt(video_dir, video_id, [x.strip() for x in langs.split(",") if x.strip()])
+    return generate_study_files(info, video_dir, subtitle, library_path_from_videos_dir(out))
 
 
 def main() -> None:
@@ -148,6 +170,11 @@ def main() -> None:
     search.add_argument("--context", type=int, default=0)
     search.add_argument("--out", default="data/videos")
 
+    analyze = sub.add_parser("analyze", help="Reanalizar un video ya descargado sin usar red")
+    analyze.add_argument("video_id")
+    analyze.add_argument("--lang", default="es-419,es,es-orig")
+    analyze.add_argument("--out", default="data/videos")
+
     args = parser.parse_args(argv)
     if args.command == "study":
         video_dir = process_video(args.url, Path(args.out), args.lang)
@@ -163,6 +190,15 @@ def main() -> None:
         videos = list_videos(library_path_from_videos_dir(videos_dir))
         results = search_library(videos, args.query, video_id=args.video_id, limit=args.limit, context=args.context)
         print_search_results(results)
+    elif args.command == "analyze":
+        try:
+            video_dir = analyze_existing(args.video_id, Path(args.out), args.lang)
+        except FileNotFoundError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            raise SystemExit(1) from exc
+        print("\nArchivos regenerados:")
+        for path in sorted(video_dir.iterdir()):
+            print(f"- {path}")
     else:
         parser.print_help()
         return
