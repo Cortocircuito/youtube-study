@@ -60,6 +60,9 @@ PLAN.md                         # roadmap del proyecto
 - Mantener la app usable sin Ollama por ahora.
 - No depender del `yt-dlp` de `apt`; usar `requirements.txt` en un venv.
 - Los archivos generados en `data/videos/` no deben versionarse.
+- No leer archivos completos de `data/videos/`, `.vtt`, `transcript.txt` o transcripciones largas salvo petición explícita del usuario.
+- Para revisar transcripciones largas, usar búsquedas, fragmentos pequeños o comandos con límites.
+- Al ejecutar planes con `openplan`, avanzar por fases cortas y pausar después de máximo 5 pasos.
 - Preferir módulos pequeños dentro de `src/youtube_study/`.
 - Cada mejora debe mantener funcionando el comando `python app.py "URL"`.
 - Después de cambios en código Python, ejecutar `python3 -m py_compile app.py src/youtube_study/*.py`.
