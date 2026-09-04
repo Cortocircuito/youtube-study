@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import csv
 import json
+import re
 from pathlib import Path
 
 from .analyzer import ConceptMention, ToolMention, flatten_questions
@@ -103,6 +105,39 @@ def write_flashcards(path: Path, cards: list[dict[str, str]]) -> None:
     for card in cards:
         lines += [f"Q: {card['question']}", f"A: {card['answer']}", f"Tags: {card.get('tags', '')}", ""]
     path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def write_study_markdown(path: Path, video_dir: Path, title: str) -> None:
+    """Create one portable Markdown file from the generated study materials."""
+    sections = [
+        ("summary.md", "Resumen"),
+        ("tools.md", "Herramientas"),
+        ("concepts.md", "Conceptos"),
+        ("questions.md", "Preguntas"),
+        ("flashcards.md", "Flashcards"),
+    ]
+    lines = [f"# Estudio consolidado: {title}", ""]
+    for filename, fallback_title in sections:
+        source = video_dir / filename
+        if not source.exists():
+            continue
+        content = source.read_text(encoding="utf-8").strip()
+        if content.startswith("# "):
+            content = content.split("\n", 1)[1].lstrip() if "\n" in content else ""
+        lines += [f"## {fallback_title}", "", content, ""]
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def write_anki_csv(path: Path, cards: list[dict[str, str]], video_id: str, channel: str | None = None) -> None:
+    """Write UTF-8 CSV ready for Anki import: Front, Back, Tags."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8-sig", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["Front", "Back", "Tags"])
+        channel_tag = re.sub(r"\s+", "_", channel.strip()) if channel else ""
+        for card in cards:
+            tags = " ".join(part for part in [f"video::{video_id}", f"channel::{channel_tag}" if channel_tag else "", card.get("tags", "")] if part)
+            writer.writerow([card["question"], card["answer"], tags])
 
 
 def write_study_guide(path: Path, title: str, tools: list[ToolMention], questions: dict[str, list[str]]) -> None:

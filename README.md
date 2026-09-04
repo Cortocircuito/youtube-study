@@ -61,6 +61,14 @@ Reanalizar un video ya descargado sin volver a descargar subtítulos:
 python app.py analyze VIDEO_ID
 ```
 
+Exportar un documento consolidado o tarjetas para Anki:
+
+```bash
+python app.py export VIDEO_ID --format markdown
+python app.py export VIDEO_ID --format anki
+python app.py export VIDEO_ID --format all
+```
+
 ## Biblioteca local
 
 La app mantiene una biblioteca en:
@@ -88,7 +96,9 @@ data/videos/VIDEO_ID/
 ├── concepts.md
 ├── questions.md
 ├── flashcards.md
-└── study-guide.md
+├── study-guide.md
+├── study.md
+└── anki.csv
 ```
 
 ## Flujo de estudio recomendado

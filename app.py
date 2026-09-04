@@ -25,7 +25,9 @@ from src.youtube_study.exporter import (
     write_flashcards,
     write_info,
     write_questions,
+    write_anki_csv,
     write_study_guide,
+    write_study_markdown,
     write_summary,
     write_tools,
     write_tools_json,
@@ -138,19 +140,39 @@ def process_video(url: str, out: Path, langs: str) -> Path:
     return generate_study_files(info, video_dir, subtitle, library_path_from_videos_dir(out))
 
 
-def analyze_existing(video_id: str, out: Path, langs: str) -> Path:
+def load_existing_video(video_id: str, out: Path, langs: str) -> tuple[dict, Path, Path]:
     video_dir = out / video_id
     if not video_dir.exists():
         raise FileNotFoundError(f"No existe el directorio del video: {video_dir}")
-
     info_path = video_dir / "info.json"
     if not info_path.exists():
         raise FileNotFoundError(f"No existe info.json para {video_id}: {info_path}")
     info = json.loads(info_path.read_text(encoding="utf-8"))
     info.setdefault("id", video_id)
-
     subtitle = choose_vtt(video_dir, video_id, [x.strip() for x in langs.split(",") if x.strip()])
+    return info, video_dir, subtitle
+
+
+def analyze_existing(video_id: str, out: Path, langs: str) -> Path:
+    info, video_dir, subtitle = load_existing_video(video_id, out, langs)
     return generate_study_files(info, video_dir, subtitle, library_path_from_videos_dir(out))
+
+
+def export_study(video_id: str, out: Path, langs: str, export_format: str) -> list[Path]:
+    info, video_dir, subtitle = load_existing_video(video_id, out, langs)
+    written: list[Path] = []
+    if export_format in {"markdown", "all"}:
+        study_path = video_dir / "study.md"
+        write_study_markdown(study_path, video_dir, info.get("title", video_id))
+        written.append(study_path)
+    if export_format in {"anki", "all"}:
+        cues = clean_vtt(subtitle)
+        tools = detect_tools(full_text(cues))
+        cards = flashcards(tools, questions(cues, tools))
+        anki_path = video_dir / "anki.csv"
+        write_anki_csv(anki_path, cards, video_id, info.get("uploader"))
+        written.append(anki_path)
+    return written
 
 
 def main() -> None:
@@ -185,6 +207,12 @@ def main() -> None:
     analyze.add_argument("--lang", default="es-419,es,es-orig")
     analyze.add_argument("--out", default="data/videos")
 
+    export = sub.add_parser("export", help="Exportar material de estudio")
+    export.add_argument("video_id")
+    export.add_argument("--format", choices=["markdown", "anki", "all"], default="all")
+    export.add_argument("--lang", default="es-419,es,es-orig")
+    export.add_argument("--out", default="data/videos")
+
     args = parser.parse_args(argv)
     if args.command == "study":
         video_dir = process_video(args.url, Path(args.out), args.lang)
@@ -208,6 +236,15 @@ def main() -> None:
             raise SystemExit(1) from exc
         print("\nArchivos regenerados:")
         for path in sorted(video_dir.iterdir()):
+            print(f"- {path}")
+    elif args.command == "export":
+        try:
+            paths = export_study(args.video_id, Path(args.out), args.lang, args.format)
+        except FileNotFoundError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            raise SystemExit(1) from exc
+        print("\nArchivos exportados:")
+        for path in paths:
             print(f"- {path}")
     else:
         parser.print_help()

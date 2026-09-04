@@ -17,6 +17,8 @@ Permitir descargar subtítulos, limpiar la transcripción y generar material de 
 - `study-guide.md`
 - `transcript.clean.txt`
 - `transcript.paragraphs.md`
+- `study.md`
+- `anki.csv`
 
 ## Comandos principales
 
@@ -47,6 +49,7 @@ python app.py list
 python app.py show VIDEO_ID
 python app.py search "consulta" --video VIDEO_ID --limit 5 --context 1
 python app.py analyze VIDEO_ID
+python app.py export VIDEO_ID --format markdown|anki|all
 ```
 
 Validar sintaxis:
