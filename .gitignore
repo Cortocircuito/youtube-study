@@ -28,6 +28,7 @@ Thumbs.db
 *.swo
 
 # Generated study data
+data/library.json
 data/videos/
 data_run/
 
