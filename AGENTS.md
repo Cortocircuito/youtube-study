@@ -52,10 +52,11 @@ python app.py analyze VIDEO_ID
 python app.py export VIDEO_ID --format markdown|anki|all
 ```
 
-Validar sintaxis:
+Validar sintaxis y tests:
 
 ```bash
 python3 -m py_compile app.py src/youtube_study/*.py
+python -m pytest
 ```
 
 ## Estructura

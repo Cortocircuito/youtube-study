@@ -118,6 +118,20 @@ data/videos/VIDEO_ID/
 4. Contesta `questions.md` sin mirar.
 5. Repasa con `flashcards.md`.
 
+## Tests
+
+Después de instalar las dependencias en el venv:
+
+```bash
+python -m pytest
+```
+
+También puedes ejecutar los tests estándar sin pytest:
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
 ## Próximos pasos
 
 - Mejorar detección heurística de herramientas y conceptos.
