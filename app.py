@@ -34,7 +34,14 @@ from src.youtube_study.exporter import (
     write_transcript,
     write_transcript_paragraphs,
 )
-from src.youtube_study.library import get_video, library_path_from_videos_dir, list_videos, upsert_video
+from src.youtube_study.library import (
+    get_video,
+    library_path_from_videos_dir,
+    list_videos,
+    rebuild_library,
+    resolve_video_path,
+    upsert_video,
+)
 from src.youtube_study.search import SearchResult, search_library
 from src.youtube_study.transcript import clean_vtt
 
@@ -64,7 +71,8 @@ def print_video_list(videos_dir: Path) -> None:
 
 
 def print_video_detail(videos_dir: Path, video_id: str) -> None:
-    video = get_video(library_path_from_videos_dir(videos_dir), video_id)
+    library_path = library_path_from_videos_dir(videos_dir)
+    video = get_video(library_path, video_id)
     if not video:
         print(f"No existe el video {video_id} en la biblioteca.")
         return
@@ -78,7 +86,7 @@ def print_video_detail(videos_dir: Path, video_id: str) -> None:
     print(f"Creado: {video.get('created_at')}")
     print(f"Actualizado: {video.get('updated_at')}")
 
-    video_dir = Path(video.get("path") or videos_dir / video_id)
+    video_dir = resolve_video_path(library_path, video.get("path") or videos_dir / video_id)
     if video_dir.exists():
         print("\nArchivos disponibles:")
         for path in sorted(p for p in video_dir.iterdir() if p.is_file()):
@@ -197,6 +205,9 @@ def main() -> None:
     show.add_argument("video_id")
     show.add_argument("--out", default="data/videos")
 
+    rebuild = sub.add_parser("rebuild-library", help="Reconstruir la biblioteca desde videos locales")
+    rebuild.add_argument("--out", default="data/videos")
+
     search = sub.add_parser("search", help="Buscar texto dentro de transcripciones")
     search.add_argument("query")
     search.add_argument("--video", dest="video_id")
@@ -229,10 +240,19 @@ def main() -> None:
         print_video_list(Path(args.out))
     elif args.command == "show":
         print_video_detail(Path(args.out), args.video_id)
+    elif args.command == "rebuild-library":
+        videos_dir = Path(args.out)
+        result = rebuild_library(library_path_from_videos_dir(videos_dir), videos_dir)
+        print(f"Biblioteca reconstruida: {result.rebuilt} videos.")
+        if result.skipped:
+            print("Omitidos:")
+            for reason in result.skipped:
+                print(f"- {reason}")
     elif args.command == "search":
         videos_dir = Path(args.out)
-        videos = list_videos(library_path_from_videos_dir(videos_dir))
-        results = search_library(videos, args.query, video_id=args.video_id, limit=args.limit, context=args.context)
+        library_path = library_path_from_videos_dir(videos_dir)
+        videos = list_videos(library_path)
+        results = search_library(videos, args.query, video_id=args.video_id, limit=args.limit, context=args.context, library_path=library_path)
         print_search_results(results)
     elif args.command == "analyze":
         try:

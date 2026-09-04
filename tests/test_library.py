@@ -1,9 +1,11 @@
+import json
 import tempfile
 from pathlib import Path
 import unittest
+import warnings
 
 from src.youtube_study.analyzer import ToolMention
-from src.youtube_study.library import get_video, load_library, upsert_video
+from src.youtube_study.library import get_video, load_library, rebuild_library, resolve_video_path, upsert_video
 
 
 class LibraryTests(unittest.TestCase):
@@ -23,6 +25,37 @@ class LibraryTests(unittest.TestCase):
             self.assertEqual(len(videos), 1)
             self.assertEqual(first["created_at"], second["created_at"])
             self.assertEqual(get_video(library_path, "video-1")["title"], "Título actualizado")
+            self.assertEqual(resolve_video_path(library_path, second["path"]), video_dir)
+
+    def test_invalid_library_is_backed_up_and_recovered(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            library_path = root / "library.json"
+            library_path.write_text("{not json", encoding="utf-8")
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                self.assertEqual(load_library(library_path), {"videos": []})
+            self.assertTrue(list(root.glob("library.json.corrupt-*")))
+            self.assertEqual(json.loads(library_path.read_text(encoding="utf-8")), {"videos": []})
+            self.assertTrue(caught)
+
+    def test_rebuild_uses_info_files_and_skips_invalid_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            videos_dir = root / "videos"
+            valid_dir = videos_dir / "valid"
+            valid_dir.mkdir(parents=True)
+            (valid_dir / "info.json").write_text(json.dumps({"id": "valid", "title": "Video válido"}), encoding="utf-8")
+            invalid_dir = videos_dir / "invalid"
+            invalid_dir.mkdir()
+            (invalid_dir / "info.json").write_text("{", encoding="utf-8")
+            missing_dir = videos_dir / "missing"
+            missing_dir.mkdir()
+
+            result = rebuild_library(root / "library.json", videos_dir)
+            self.assertEqual(result.rebuilt, 1)
+            self.assertEqual(len(result.skipped), 2)
+            self.assertEqual(load_library(root / "library.json")["videos"][0]["id"], "valid")
 
 
 if __name__ == "__main__":

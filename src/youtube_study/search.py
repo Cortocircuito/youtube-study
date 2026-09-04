@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .library import resolve_video_path
+
 
 @dataclass
 class SearchResult:
@@ -67,13 +69,15 @@ def search_library(
     video_id: str | None = None,
     limit: int = 10,
     context: int = 0,
+    library_path: Path | None = None,
 ) -> list[SearchResult]:
     results: list[SearchResult] = []
     for video in videos:
         current_id = str(video.get("id") or "")
         if video_id and current_id != video_id:
             continue
-        video_dir = Path(str(video.get("path") or ""))
+        stored_path = str(video.get("path") or "")
+        video_dir = resolve_video_path(library_path, stored_path) if library_path else Path(stored_path)
         remaining = limit - len(results)
         if remaining <= 0:
             break
