@@ -1,8 +1,8 @@
 ---
 title: "Mejoras de YouTube Study sin Ollama"
-status: in_progress
+status: done
 created: "2026-08-30T11:53:36.691Z"
-updated: "2026-08-30T12:03:46.844Z"
+updated: "2026-09-04T15:09:09.854Z"
 type: feature
 ---
 
@@ -233,8 +233,15 @@ anki.csv
 
 ## Criterios de éxito
 
-- `python app.py "URL"` sigue funcionando.
-- Videos ya descargados se pueden reanalizar sin red.
-- Biblioteca lista videos y permite búsquedas útiles.
-- Archivos generados sirven para estudiar sin abrir YouTube.
-- No se usa Ollama en esta fase.
+## Criterios de éxito
+
+- ✅ `python app.py "URL"` sigue funcionando.
+- ✅ Videos ya descargados se pueden reanalizar sin red.
+- ✅ Biblioteca lista videos y permite búsquedas útiles.
+- ✅ Archivos generados sirven para estudiar sin abrir YouTube.
+- ✅ No se usa Ollama en esta fase.
+- ✅ Verificación final ejecutada en `.venv`: `python -m pytest` — 5 tests passed.
+
+## Estado final
+
+Plan completado el 2026-08-30.
