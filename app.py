@@ -132,8 +132,8 @@ def generate_study_files(info: dict, video_dir: Path, subtitle: Path, library_pa
     return video_dir
 
 
-def process_video(url: str, out: Path, langs: str) -> Path:
-    info = download_subtitles(url, out, langs)
+def process_video(url: str, out: Path, langs: str, *, force_download: bool = False, quiet: bool = False) -> Path:
+    info = download_subtitles(url, out, langs, force_download=force_download, quiet=quiet)
     video_id = info["id"]
     video_dir = out / video_id
     subtitle = choose_vtt(video_dir, video_id, [x.strip() for x in langs.split(",") if x.strip()])
@@ -187,6 +187,8 @@ def main() -> None:
     study.add_argument("url")
     study.add_argument("--lang", default="es-419,es,es-orig")
     study.add_argument("--out", default="data/videos")
+    study.add_argument("--force-download", action="store_true", help="Volver a descargar subtítulos aunque ya existan")
+    study.add_argument("--quiet", action="store_true", help="Reducir la salida de yt-dlp")
 
     list_cmd = sub.add_parser("list", help="Listar videos guardados")
     list_cmd.add_argument("--out", default="data/videos")
@@ -215,7 +217,11 @@ def main() -> None:
 
     args = parser.parse_args(argv)
     if args.command == "study":
-        video_dir = process_video(args.url, Path(args.out), args.lang)
+        try:
+            video_dir = process_video(args.url, Path(args.out), args.lang, force_download=args.force_download, quiet=args.quiet)
+        except (RuntimeError, FileNotFoundError) as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            raise SystemExit(1) from exc
         print("\nArchivos generados:")
         for path in sorted(video_dir.iterdir()):
             print(f"- {path}")

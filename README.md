@@ -36,6 +36,15 @@ O explícitamente:
 python app.py study "https://www.youtube.com/watch?v=Yj51wXMwFwE" --lang "es-419,es" --out data/videos
 ```
 
+Opciones útiles al descargar:
+
+```bash
+python app.py study "URL" --quiet
+python app.py study "URL" --force-download
+```
+
+La app prioriza subtítulos españoles y muestra un error claro si no encuentra ninguno. Si `yt-dlp` está desactualizado, activa el venv y reinstala con `pip install -r requirements.txt`.
+
 Listar videos guardados en la biblioteca local:
 
 ```bash
