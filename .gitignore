@@ -1,6 +1,43 @@
-.venv/
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment/local config
+.env
+.env.*
+!.env.example
+
+# OS/editor
 .DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Generated study data
 data/videos/
 data_run/
+
+# Logs/temp
+*.log
+*.tmp
+.tmp/
+tmp/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
