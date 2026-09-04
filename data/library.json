@@ -8,12 +8,12 @@
       "url": "https://www.youtube.com/watch?v=D1CFRS9Ikh8",
       "path": "data/videos/D1CFRS9Ikh8",
       "tools": [
+        "claude",
         "herdr",
-        "codex",
-        "claude"
+        "codex"
       ],
       "created_at": "2026-08-30T13:43:15+00:00",
-      "updated_at": "2026-08-30T14:05:20+00:00"
+      "updated_at": "2026-09-04T13:51:56+00:00"
     },
     {
       "id": "Yj51wXMwFwE",

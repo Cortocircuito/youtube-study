@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from .analyzer import ToolMention
-from .transcript import Cue, as_text
+from .transcript import Cue, as_text, chunk_by_minutes
 
 
 def write_info(path: Path, info: dict, subtitle: Path) -> None:
@@ -21,6 +21,17 @@ def write_info(path: Path, info: dict, subtitle: Path) -> None:
 
 def write_transcript(path: Path, cues: list[Cue]) -> None:
     path.write_text(as_text(cues, timestamps=True), encoding="utf-8")
+
+
+def write_clean_transcript(path: Path, cues: list[Cue]) -> None:
+    path.write_text(as_text(cues, timestamps=False), encoding="utf-8")
+
+
+def write_transcript_paragraphs(path: Path, cues: list[Cue], minutes: int = 5) -> None:
+    lines = ["# Transcripción por bloques", ""]
+    for start, end, text in chunk_by_minutes(cues, minutes):
+        lines += [f"## {start} - {end}", "", text.strip(), ""]
+    path.write_text("\n".join(lines), encoding="utf-8")
 
 
 def write_tools(path: Path, tools: list[ToolMention]) -> None:

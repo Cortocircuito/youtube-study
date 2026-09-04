@@ -18,6 +18,7 @@ from src.youtube_study.analyzer import (
 )
 from src.youtube_study.downloader import choose_vtt, download_subtitles
 from src.youtube_study.exporter import (
+    write_clean_transcript,
     write_concepts,
     write_flashcards,
     write_info,
@@ -26,6 +27,7 @@ from src.youtube_study.exporter import (
     write_summary,
     write_tools,
     write_transcript,
+    write_transcript_paragraphs,
 )
 from src.youtube_study.library import get_video, library_path_from_videos_dir, list_videos, upsert_video
 from src.youtube_study.search import SearchResult, search_library
@@ -110,6 +112,8 @@ def generate_study_files(info: dict, video_dir: Path, subtitle: Path, library_pa
 
     write_info(video_dir / "info.json", info, subtitle)
     write_transcript(video_dir / "transcript.txt", cues)
+    write_clean_transcript(video_dir / "transcript.clean.txt", cues)
+    write_transcript_paragraphs(video_dir / "transcript.paragraphs.md", cues)
     write_summary(video_dir / "summary.md", title, kws, ideas, sections)
     write_tools(video_dir / "tools.md", tools)
     write_concepts(video_dir / "concepts.md", sections)

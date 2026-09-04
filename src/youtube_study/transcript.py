@@ -28,6 +28,22 @@ def timestamp_from_seconds(total: int) -> str:
     return f"{h:02d}:{m:02d}:{s:02d}"
 
 
+ALIASES = {
+    r"\bmoshie\b": "Moshi",
+    r"\bmochi\b": "Moshi",
+    r"\bherder\b": "Herdr",
+    r"\bgerd\b": "Herdr",
+    r"\bclaudio\b": "Claude",
+    r"\bclou\b": "Claude",
+}
+
+
+def normalize_aliases(text: str) -> str:
+    for pattern, replacement in ALIASES.items():
+        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    return text
+
+
 def clean_vtt(path: Path) -> list[Cue]:
     cues: list[Cue] = []
     current_time = ""
@@ -44,7 +60,7 @@ def clean_vtt(path: Path) -> list[Cue]:
                 line = re.sub(r"\s+", " ", line).strip()
                 if line:
                     cleaned_lines.append(line)
-            text = merge_caption_lines(cleaned_lines)
+            text = normalize_aliases(merge_caption_lines(cleaned_lines))
             if text:
                 cues.append(Cue(current_time, text))
         current_time = ""
@@ -89,13 +105,15 @@ def remove_rolling_overlaps(cues: list[Cue]) -> list[Cue]:
         words = cue.text.split()
         if not words:
             continue
-        if words == previous_words or (previous_words and previous_words[-len(words):] == words):
+        previous_norm = [word.lower().strip(".,;:!?¿¡()[]{}\"") for word in previous_words]
+        words_norm = [word.lower().strip(".,;:!?¿¡()[]{}\"") for word in words]
+        if words_norm == previous_norm or (previous_norm and previous_norm[-len(words_norm):] == words_norm):
             continue
-        # Remove overlap between previous tail and current head.
+        # Remove overlap between previous tail and current head, ignoring punctuation/case.
         overlap = 0
-        max_overlap = min(len(previous_words), len(words))
+        max_overlap = min(len(previous_norm), len(words_norm))
         for size in range(max_overlap, 0, -1):
-            if previous_words[-size:] == words[:size]:
+            if previous_norm[-size:] == words_norm[:size]:
                 overlap = size
                 break
         new_words = words[overlap:]
