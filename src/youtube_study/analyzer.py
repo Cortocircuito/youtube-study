@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from .transcript import Cue, chunk_by_minutes
 
 STOPWORDS = set("""
-a acá ahí al algo algunas algunos ante antes aquí así aunque cada casi como con contra cual cuando de del desde donde dos e el ella ellas ellos en entre era eran es esa esas ese eso esos esta estaba están estar estas esté este esto estos fue han hasta hay la las le les lo los más me mi mis muy no nos o para pero por porque que se ser si sin sobre son su sus te tenía tienen todo todos tu un una unas unos y ya yo bien entonces ejemplo ahora ver voy vos qué cómo cosa cosas hacer ahí acá directamente caso gente tener tiene tengo está estoy estás estamos están vas vamos puedo podés podes puede pueden podría verdad realmente mostrar miren vean después acá abajo arriba
+a acá ahí al algo algunas algunos ante antes aquí así aunque cada casi como con contra cual cuando de del desde donde dos e el ella ellas ellos en entre era eran es esa esas ese eso esos esta estaba están estar estas esté este esto estos fue han hasta hay la las le les lo los más me mi mis muy no nos o para pero por porque que se ser si sin sobre son su sus te tenía tienen tenemos todo todos tu un una unas unos y ya yo bien entonces ejemplo ahora ver voy vos qué cómo cosa cosas hacer ahí acá directamente caso gente tener tiene tengo está estoy estás estamos están vas vamos puedo podés podes puede pueden podría verdad realmente mostrar miren vean después acá abajo arriba también bien
 """.split())
 
 KNOWN_TOOLS = {
@@ -33,6 +33,15 @@ class ToolMention:
     name: str
     count: int
     description: str
+    kind: str = "known"
+
+
+@dataclass
+class ConceptMention:
+    name: str
+    score: int
+    count: int
+    timestamps: list[str]
 
 
 def full_text(cues: list[Cue]) -> str:
@@ -50,6 +59,7 @@ def detect_tools(text: str) -> list[ToolMention]:
     aliases = {
         "moshi": ["moshi", "moshie", "mochi"],
         "herdr": ["herdr", "herder", "gerd"],
+        "claude": ["claude", "claudio", "clou"],
     }
     mentions: list[ToolMention] = []
     for name, desc in KNOWN_TOOLS.items():
@@ -59,8 +69,27 @@ def detect_tools(text: str) -> list[ToolMention]:
             pattern = r"(?<![\w.-])" + re.escape(alias.lower()) + r"(?![\w.-])"
             count += len(re.findall(pattern, lower))
         if count:
-            mentions.append(ToolMention(name, count, desc))
-    return sorted(mentions, key=lambda x: x.count, reverse=True)
+            mentions.append(ToolMention(name, count, desc, "known"))
+    mentions.extend(detect_unknown_tools(text, {tool.name for tool in mentions}))
+    return sorted(mentions, key=lambda x: (x.kind != "known", -x.count, x.name))
+
+
+def detect_unknown_tools(text: str, known_names: set[str], limit: int = 8) -> list[ToolMention]:
+    """Detect possible tool/product names not present in KNOWN_TOOLS."""
+    candidates = re.findall(r"\b[a-zA-Z][a-zA-Z0-9]*(?:[.-][a-zA-Z0-9]+)+\b", text)
+    candidates += re.findall(r"\b[A-Z]{2,8}\b", text)
+    candidates += re.findall(r"\b[A-Z][a-z]+(?:[A-Z][a-z0-9]+)+\b", text)
+    counts = Counter(candidates)
+    results: list[ToolMention] = []
+    ignored = {"Entonces", "Ahora", "Bien", "Mirá", "Vean", "Vos", "Para", "Esto", "Como"}
+    for name, count in counts.most_common():
+        normalized = name.lower().strip(".-")
+        if normalized in known_names or normalized in STOPWORDS or name in ignored or count < 2:
+            continue
+        results.append(ToolMention(name, count, "Posible herramienta o nombre propio detectado heurísticamente.", "unknown"))
+        if len(results) >= limit:
+            break
+    return results
 
 
 def split_sentences(text: str) -> list[str]:
@@ -106,22 +135,52 @@ def section_summaries(cues: list[Cue], minutes: int = 5) -> list[tuple[str, str,
     return sections
 
 
-def questions(cues: list[Cue], tools: list[ToolMention], limit: int = 10) -> list[str]:
-    qs = []
-    for tool in tools[:8]:
-        qs.append(f"¿Qué papel cumple {tool.name} en el flujo explicado?")
+def concept_mentions(cues: list[Cue], limit: int = 20) -> list[ConceptMention]:
+    text = full_text(cues)
+    top = keywords(text, limit)
+    concepts: list[ConceptMention] = []
+    for word, count in top:
+        timestamps: list[str] = []
+        pattern = re.compile(r"(?<![\w.-])" + re.escape(word) + r"(?![\w.-])", re.IGNORECASE)
+        for cue in cues:
+            if pattern.search(cue.text):
+                timestamps.append(cue.start)
+            if len(timestamps) >= 5:
+                break
+        score = count + min(len(timestamps), 5) * 2
+        concepts.append(ConceptMention(word, score, count, timestamps))
+    return sorted(concepts, key=lambda item: item.score, reverse=True)
+
+
+def questions(cues: list[Cue], tools: list[ToolMention], limit: int = 10) -> dict[str, list[str]]:
     text = full_text(cues).lower()
+    basic = [f"¿Qué es {tool.name} y para qué se menciona?" for tool in tools[:4]]
+    comprehension = [f"¿Qué papel cumple {tool.name} en el flujo explicado?" for tool in tools[:6]]
+    practice: list[str] = []
     if "puerto 22" in text:
-        qs.append("¿Por qué no conviene abrir el puerto 22 directamente al router?")
+        practice.append("¿Por qué no conviene abrir el puerto 22 directamente al router?")
     if "authorized keys" in text or "llave" in text:
-        qs.append("¿Cuál es la diferencia entre llave pública y llave privada en SSH?")
+        practice.append("¿Cuál es la diferencia entre llave pública y llave privada en SSH?")
     if "qr" in text:
-        qs.append("¿Por qué el QR de emparejamiento debe mantenerse privado?")
-    return qs[:limit]
+        practice.append("¿Por qué el QR de emparejamiento debe mantenerse privado?")
+    if tools:
+        practice.append("¿Qué pasos repetirías en tu máquina después de ver el video?")
+    return {
+        "basicas": basic[:limit],
+        "comprension": comprehension[:limit],
+        "practicas": practice[:limit],
+    }
 
 
-def flashcards(tools: list[ToolMention], qs: list[str]) -> list[tuple[str, str]]:
-    cards = [(f"¿Qué es {tool.name}?", tool.description) for tool in tools[:10]]
-    for q in qs[:5]:
-        cards.append((q, "Respóndelo usando la sección correspondiente de la transcripción."))
+def flatten_questions(qs: dict[str, list[str]]) -> list[str]:
+    return [question for group in qs.values() for question in group]
+
+
+def flashcards(tools: list[ToolMention], qs: dict[str, list[str]]) -> list[dict[str, str]]:
+    cards = [
+        {"question": f"¿Qué es {tool.name}?", "answer": tool.description, "tags": f"tool {tool.kind} {tool.name}"}
+        for tool in tools[:10]
+    ]
+    for q in flatten_questions(qs)[:5]:
+        cards.append({"question": q, "answer": "Respóndelo usando la sección correspondiente de la transcripción.", "tags": "question review"})
     return cards

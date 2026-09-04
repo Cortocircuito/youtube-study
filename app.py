@@ -8,6 +8,7 @@ from pathlib import Path
 import json
 
 from src.youtube_study.analyzer import (
+    concept_mentions,
     detect_tools,
     flashcards,
     full_text,
@@ -20,12 +21,14 @@ from src.youtube_study.downloader import choose_vtt, download_subtitles
 from src.youtube_study.exporter import (
     write_clean_transcript,
     write_concepts,
+    write_concepts_json,
     write_flashcards,
     write_info,
     write_questions,
     write_study_guide,
     write_summary,
     write_tools,
+    write_tools_json,
     write_transcript,
     write_transcript_paragraphs,
 )
@@ -106,6 +109,7 @@ def generate_study_files(info: dict, video_dir: Path, subtitle: Path, library_pa
     tools = detect_tools(text)
     ideas = important_ideas(cues)
     sections = section_summaries(cues)
+    concepts = concept_mentions(cues)
     qs = questions(cues, tools)
     cards = flashcards(tools, qs)
     title = info.get("title", video_id)
@@ -116,7 +120,9 @@ def generate_study_files(info: dict, video_dir: Path, subtitle: Path, library_pa
     write_transcript_paragraphs(video_dir / "transcript.paragraphs.md", cues)
     write_summary(video_dir / "summary.md", title, kws, ideas, sections)
     write_tools(video_dir / "tools.md", tools)
+    write_tools_json(video_dir / "tools.json", tools)
     write_concepts(video_dir / "concepts.md", sections)
+    write_concepts_json(video_dir / "concepts.json", concepts)
     write_questions(video_dir / "questions.md", qs)
     write_flashcards(video_dir / "flashcards.md", cards)
     write_study_guide(video_dir / "study-guide.md", title, tools, qs)
