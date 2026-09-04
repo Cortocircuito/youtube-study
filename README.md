@@ -24,6 +24,8 @@ pip install -r requirements.txt
 
 ## Uso rápido
 
+Analizar un video nuevo:
+
 ```bash
 python app.py "https://www.youtube.com/watch?v=Yj51wXMwFwE"
 ```
@@ -33,6 +35,41 @@ O explícitamente:
 ```bash
 python app.py study "https://www.youtube.com/watch?v=Yj51wXMwFwE" --lang "es-419,es" --out data/videos
 ```
+
+Listar videos guardados en la biblioteca local:
+
+```bash
+python app.py list
+```
+
+Ver detalle de un video estudiado:
+
+```bash
+python app.py show VIDEO_ID
+```
+
+Buscar texto dentro de transcripciones:
+
+```bash
+python app.py search "consulta"
+python app.py search "consulta" --video VIDEO_ID --limit 5 --context 1
+```
+
+Reanalizar un video ya descargado sin volver a descargar subtítulos:
+
+```bash
+python app.py analyze VIDEO_ID
+```
+
+## Biblioteca local
+
+La app mantiene una biblioteca en:
+
+```txt
+data/library.json
+```
+
+Ahí guarda metadata de cada video: id, título, canal, duración, URL, ruta local, herramientas detectadas y fechas.
 
 ## Archivos generados
 
@@ -44,6 +81,8 @@ data/videos/VIDEO_ID/
 ├── VIDEO_ID.es.vtt
 ├── info.json
 ├── transcript.txt
+├── transcript.clean.txt
+├── transcript.paragraphs.md
 ├── summary.md
 ├── tools.md
 ├── concepts.md
@@ -62,7 +101,9 @@ data/videos/VIDEO_ID/
 
 ## Próximos pasos
 
-- Añadir soporte para Ollama y resúmenes con IA local.
-- Añadir búsqueda semántica dentro de las transcripciones.
-- Crear interfaz web con Streamlit o FastAPI.
-- Exportar a Anki/PDF.
+- Mejorar detección heurística de herramientas y conceptos.
+- Exportar `tools.json` y `concepts.json`.
+- Crear `study.md` consolidado.
+- Exportar flashcards a Anki CSV.
+- Añadir tests mínimos.
+- Dejar Ollama para una fase futura opcional.

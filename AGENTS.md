@@ -15,6 +15,8 @@ Permitir descargar subtítulos, limpiar la transcripción y generar material de 
 - `questions.md`
 - `flashcards.md`
 - `study-guide.md`
+- `transcript.clean.txt`
+- `transcript.paragraphs.md`
 
 ## Comandos principales
 
@@ -36,6 +38,15 @@ Atajo equivalente:
 
 ```bash
 python app.py "URL"
+```
+
+Comandos de biblioteca y búsqueda:
+
+```bash
+python app.py list
+python app.py show VIDEO_ID
+python app.py search "consulta" --video VIDEO_ID --limit 5 --context 1
+python app.py analyze VIDEO_ID
 ```
 
 Validar sintaxis:
