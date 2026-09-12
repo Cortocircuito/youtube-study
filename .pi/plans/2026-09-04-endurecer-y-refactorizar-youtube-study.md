@@ -112,7 +112,7 @@ Criterio de aceptación: selección coincide con política en fixtures; document
 
 ⏸️ PAUSE — Revisar política con ejemplos español manual/automático/inglés.
 
-## Fase 4 — Consistencia de análisis y exportaciones (prioridad alta)
+## Fase 4 — Consistencia de análisis y exportaciones (prioridad alta) [DONE:5]
 
 1. Crear estructura `AnalysisResult` con cues, keywords, tools, concepts, questions y cards para calcular una sola vez.
 2. Hacer que `analyze` escriba todos los artefactos desde mismo resultado y registre versión/formato del análisis.
@@ -120,12 +120,14 @@ Criterio de aceptación: selección coincide con política en fixtures; document
 4. Generar `study.md` desde datos estructurados o resultado de análisis, no releyendo Markdown generado.
 5. Añadir tests de `tools.json`, `concepts.json`, `study.md` y `anki.csv`, incluyendo UTF-8, quoting CSV y tags.
 
-Verificación:
+Verificación ejecutada:
 
 ```bash
+.venv/bin/python -m py_compile app.py src/youtube_study/*.py
 .venv/bin/python app.py analyze Yj51wXMwFwE
 .venv/bin/python app.py export Yj51wXMwFwE --format all
 .venv/bin/python -m pytest tests/test_exporter.py tests/test_pipeline.py
+.venv/bin/python -m pytest
 ```
 
 Criterio de aceptación: todos los archivos de una ejecución representan mismo análisis y exportar nunca usa contenido obsoleto sin avisar.

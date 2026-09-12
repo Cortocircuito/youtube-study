@@ -3,10 +3,11 @@ from __future__ import annotations
 import csv
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .analyzer import ConceptMention, ToolMention, flatten_questions
+from .analyzer import ANALYSIS_FORMAT_VERSION, AnalysisResult, ConceptMention, ToolMention, flatten_questions
 from .transcript import Cue, as_text, chunk_by_minutes
 
 
@@ -23,7 +24,14 @@ def _source_subtitle_payload(subtitle: Any) -> str | dict[str, Any]:
     return str(subtitle)
 
 
-def write_info(path: Path, info: dict, subtitle: Any) -> None:
+def _analysis_payload(format_version: int = ANALYSIS_FORMAT_VERSION) -> dict[str, Any]:
+    return {
+        "format_version": format_version,
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }
+
+
+def write_info(path: Path, info: dict, subtitle: Any, *, analysis_version: int = ANALYSIS_FORMAT_VERSION) -> None:
     payload = {
         "id": info.get("id"),
         "title": info.get("title"),
@@ -31,6 +39,7 @@ def write_info(path: Path, info: dict, subtitle: Any) -> None:
         "duration": info.get("duration"),
         "webpage_url": info.get("webpage_url"),
         "source_subtitle": _source_subtitle_payload(subtitle),
+        "analysis": _analysis_payload(analysis_version),
     }
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -121,8 +130,52 @@ def write_flashcards(path: Path, cards: list[dict[str, str]]) -> None:
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
+def write_study_markdown_from_result(path: Path, title: str, result: AnalysisResult) -> None:
+    """Create one portable Markdown file from one structured analysis result."""
+    lines = [f"# Estudio consolidado: {title}", "", f"_Formato de análisis: {result.format_version}_", ""]
+
+    lines += ["## Resumen", "", "### Palabras clave", ""]
+    lines += [f"- {word}: {count}" for word, count in result.keywords[:15]] or ["Sin palabras clave."]
+    lines += ["", "### Ideas importantes", ""]
+    lines += [f"- [{timestamp}] {idea}" for timestamp, idea in result.ideas] or ["Sin ideas generadas."]
+    lines.append("")
+
+    lines += ["## Herramientas", ""]
+    if result.tools:
+        for tool in result.tools:
+            lines += [
+                f"### {tool.name}",
+                "",
+                f"- Tipo: {'conocida' if tool.kind == 'known' else 'posible/desconocida'}",
+                f"- Menciones: {tool.count}",
+                f"- Descripción: {tool.description}",
+                "",
+            ]
+    else:
+        lines += ["No se detectaron herramientas conocidas.", ""]
+
+    lines += ["## Conceptos", ""]
+    for time_range, topic, ideas in result.sections:
+        lines += [f"### {time_range}", "", f"**Palabras clave:** {topic or 'N/D'}", "", "**Ideas:**"]
+        lines += [f"- {idea}" for idea in ideas]
+        lines.append("")
+
+    lines += ["## Preguntas", ""]
+    headings = {"basicas": "Básicas", "comprension": "Comprensión", "practicas": "Prácticas"}
+    for level, items in result.questions.items():
+        lines += [f"### {headings.get(level, level.title())}", ""]
+        lines += [f"{index}. {question}" for index, question in enumerate(items, 1)] or ["Sin preguntas generadas."]
+        lines.append("")
+
+    lines += ["## Flashcards", ""]
+    for card in result.cards:
+        lines += [f"Q: {card['question']}", f"A: {card['answer']}", f"Tags: {card.get('tags', '')}", ""]
+
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
 def write_study_markdown(path: Path, video_dir: Path, title: str) -> None:
-    """Create one portable Markdown file from the generated study materials."""
+    """Create one portable Markdown file from generated Markdown materials (legacy helper)."""
     sections = [
         ("summary.md", "Resumen"),
         ("tools.md", "Herramientas"),

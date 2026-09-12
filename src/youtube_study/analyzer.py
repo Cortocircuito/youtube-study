@@ -6,6 +6,8 @@ from dataclasses import dataclass
 
 from .transcript import Cue, chunk_by_minutes
 
+ANALYSIS_FORMAT_VERSION = 1
+
 STOPWORDS = set("""
 a acá ahí al algo algunas algunos ante antes aquí así aunque cada casi como con contra cual cuando de del desde donde dos e el ella ellas ellos en entre era eran es esa esas ese eso esos esta estaba están estar estas esté este esto estos fue han hasta hay la las le les lo los más me mi mis muy no nos o para pero por porque que se ser si sin sobre son su sus te tenía tienen tenemos todo todos tu un una unas unos y ya yo bien entonces ejemplo ahora ver voy vos qué cómo cosa cosas hacer ahí acá directamente caso gente tener tiene tengo está estoy estás estamos están vas vamos puedo podés podes puede pueden podría verdad realmente mostrar miren vean después acá abajo arriba también bien
 """.split())
@@ -42,6 +44,20 @@ class ConceptMention:
     score: int
     count: int
     timestamps: list[str]
+
+
+@dataclass
+class AnalysisResult:
+    cues: list[Cue]
+    text: str
+    keywords: list[tuple[str, int]]
+    tools: list[ToolMention]
+    ideas: list[tuple[str, str]]
+    sections: list[tuple[str, str, list[str]]]
+    concepts: list[ConceptMention]
+    questions: dict[str, list[str]]
+    cards: list[dict[str, str]]
+    format_version: int = ANALYSIS_FORMAT_VERSION
 
 
 def full_text(cues: list[Cue]) -> str:
@@ -184,3 +200,20 @@ def flashcards(tools: list[ToolMention], qs: dict[str, list[str]]) -> list[dict[
     for q in flatten_questions(qs)[:5]:
         cards.append({"question": q, "answer": "Respóndelo usando la sección correspondiente de la transcripción.", "tags": "question review"})
     return cards
+
+
+def analyze_cues(cues: list[Cue]) -> AnalysisResult:
+    text = full_text(cues)
+    tools = detect_tools(text)
+    qs = questions(cues, tools)
+    return AnalysisResult(
+        cues=cues,
+        text=text,
+        keywords=keywords(text),
+        tools=tools,
+        ideas=important_ideas(cues),
+        sections=section_summaries(cues),
+        concepts=concept_mentions(cues),
+        questions=qs,
+        cards=flashcards(tools, qs),
+    )

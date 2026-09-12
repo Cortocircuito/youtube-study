@@ -7,16 +7,7 @@ from pathlib import Path
 
 import json
 
-from src.youtube_study.analyzer import (
-    concept_mentions,
-    detect_tools,
-    flashcards,
-    full_text,
-    important_ideas,
-    keywords,
-    questions,
-    section_summaries,
-)
+from src.youtube_study.analyzer import analyze_cues
 from src.youtube_study.downloader import SubtitleSelection, choose_subtitle, download_subtitles
 from src.youtube_study.errors import AppError, VideoDataError
 from src.youtube_study.exporter import (
@@ -28,7 +19,7 @@ from src.youtube_study.exporter import (
     write_questions,
     write_anki_csv,
     write_study_guide,
-    write_study_markdown,
+    write_study_markdown_from_result,
     write_summary,
     write_tools,
     write_tools_json,
@@ -113,31 +104,24 @@ def print_search_results(results: list[SearchResult]) -> None:
 
 def generate_study_files(info: dict, video_dir: Path, subtitle: SubtitleSelection, library_path: Path) -> Path:
     video_id = info["id"]
-    cues = clean_vtt(subtitle.path)
-    text = full_text(cues)
-
-    kws = keywords(text)
-    tools = detect_tools(text)
-    ideas = important_ideas(cues)
-    sections = section_summaries(cues)
-    concepts = concept_mentions(cues)
-    qs = questions(cues, tools)
-    cards = flashcards(tools, qs)
+    result = analyze_cues(clean_vtt(subtitle.path))
     title = info.get("title", video_id)
 
-    write_info(video_dir / "info.json", info, subtitle)
-    write_transcript(video_dir / "transcript.txt", cues)
-    write_clean_transcript(video_dir / "transcript.clean.txt", cues)
-    write_transcript_paragraphs(video_dir / "transcript.paragraphs.md", cues)
-    write_summary(video_dir / "summary.md", title, kws, ideas, sections)
-    write_tools(video_dir / "tools.md", tools)
-    write_tools_json(video_dir / "tools.json", tools)
-    write_concepts(video_dir / "concepts.md", sections)
-    write_concepts_json(video_dir / "concepts.json", concepts)
-    write_questions(video_dir / "questions.md", qs)
-    write_flashcards(video_dir / "flashcards.md", cards)
-    write_study_guide(video_dir / "study-guide.md", title, tools, qs)
-    upsert_video(library_path, info, video_dir, tools)
+    write_info(video_dir / "info.json", info, subtitle, analysis_version=result.format_version)
+    write_transcript(video_dir / "transcript.txt", result.cues)
+    write_clean_transcript(video_dir / "transcript.clean.txt", result.cues)
+    write_transcript_paragraphs(video_dir / "transcript.paragraphs.md", result.cues)
+    write_summary(video_dir / "summary.md", title, result.keywords, result.ideas, result.sections)
+    write_tools(video_dir / "tools.md", result.tools)
+    write_tools_json(video_dir / "tools.json", result.tools)
+    write_concepts(video_dir / "concepts.md", result.sections)
+    write_concepts_json(video_dir / "concepts.json", result.concepts)
+    write_questions(video_dir / "questions.md", result.questions)
+    write_flashcards(video_dir / "flashcards.md", result.cards)
+    write_study_guide(video_dir / "study-guide.md", title, result.tools, result.questions)
+    write_study_markdown_from_result(video_dir / "study.md", title, result)
+    write_anki_csv(video_dir / "anki.csv", result.cards, video_id, info.get("uploader"))
+    upsert_video(library_path, info, video_dir, result.tools)
     return video_dir
 
 
@@ -174,17 +158,16 @@ def analyze_existing(video_id: str, out: Path, langs: str) -> Path:
 
 def export_study(video_id: str, out: Path, langs: str, export_format: str) -> list[Path]:
     info, video_dir, subtitle = load_existing_video(video_id, out, langs)
+    result = analyze_cues(clean_vtt(subtitle.path))
+    title = info.get("title", video_id)
     written: list[Path] = []
     if export_format in {"markdown", "all"}:
         study_path = video_dir / "study.md"
-        write_study_markdown(study_path, video_dir, info.get("title", video_id))
+        write_study_markdown_from_result(study_path, title, result)
         written.append(study_path)
     if export_format in {"anki", "all"}:
-        cues = clean_vtt(subtitle.path)
-        tools = detect_tools(full_text(cues))
-        cards = flashcards(tools, questions(cues, tools))
         anki_path = video_dir / "anki.csv"
-        write_anki_csv(anki_path, cards, video_id, info.get("uploader"))
+        write_anki_csv(anki_path, result.cards, video_id, info.get("uploader"))
         written.append(anki_path)
     return written
 
