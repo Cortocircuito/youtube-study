@@ -11,9 +11,10 @@ from pathlib import Path
 from typing import Any
 
 from .analyzer import ToolMention
+from .errors import AppError
 
 
-class LibraryError(Exception):
+class LibraryError(AppError):
     """Expected error while reading or writing the local video library."""
 
 

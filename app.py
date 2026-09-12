@@ -18,6 +18,7 @@ from src.youtube_study.analyzer import (
     section_summaries,
 )
 from src.youtube_study.downloader import choose_vtt, download_subtitles
+from src.youtube_study.errors import AppError, VideoDataError
 from src.youtube_study.exporter import (
     write_clean_transcript,
     write_concepts,
@@ -35,6 +36,7 @@ from src.youtube_study.exporter import (
     write_transcript_paragraphs,
 )
 from src.youtube_study.library import (
+    LibraryError,
     get_video,
     library_path_from_videos_dir,
     list_videos,
@@ -74,8 +76,7 @@ def print_video_detail(videos_dir: Path, video_id: str) -> None:
     library_path = library_path_from_videos_dir(videos_dir)
     video = get_video(library_path, video_id)
     if not video:
-        print(f"No existe el video {video_id} en la biblioteca.")
-        return
+        raise VideoDataError(f"No existe el video {video_id} en la biblioteca.")
     print(f"ID: {video.get('id')}")
     print(f"Título: {video.get('title')}")
     print(f"Canal: {video.get('channel') or 'N/D'}")
@@ -151,11 +152,16 @@ def process_video(url: str, out: Path, langs: str, *, force_download: bool = Fal
 def load_existing_video(video_id: str, out: Path, langs: str) -> tuple[dict, Path, Path]:
     video_dir = out / video_id
     if not video_dir.exists():
-        raise FileNotFoundError(f"No existe el directorio del video: {video_dir}")
+        raise VideoDataError(f"No existe el directorio del video: {video_dir}")
     info_path = video_dir / "info.json"
     if not info_path.exists():
-        raise FileNotFoundError(f"No existe info.json para {video_id}: {info_path}")
-    info = json.loads(info_path.read_text(encoding="utf-8"))
+        raise VideoDataError(f"No existe info.json para {video_id}: {info_path}")
+    try:
+        info = json.loads(info_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise VideoDataError(f"info.json inválido para {video_id}: {info_path}") from exc
+    if not isinstance(info, dict):
+        raise VideoDataError(f"info.json inválido para {video_id}: se esperaba un objeto JSON")
     info.setdefault("id", video_id)
     subtitle = choose_vtt(video_dir, video_id, [x.strip() for x in langs.split(",") if x.strip()])
     return info, video_dir, subtitle
@@ -183,8 +189,21 @@ def export_study(video_id: str, out: Path, langs: str, export_format: str) -> li
     return written
 
 
-def main() -> None:
-    argv = sys.argv[1:]
+def positive_int(value: str) -> int:
+    number = int(value)
+    if number < 1:
+        raise argparse.ArgumentTypeError("debe ser >= 1")
+    return number
+
+
+def nonnegative_int(value: str) -> int:
+    number = int(value)
+    if number < 0:
+        raise argparse.ArgumentTypeError("debe ser >= 0")
+    return number
+
+
+def run(argv: list[str]) -> int:
     if argv and argv[0].startswith(("http://", "https://")):
         argv = ["study", *argv]
 
@@ -211,8 +230,8 @@ def main() -> None:
     search = sub.add_parser("search", help="Buscar texto dentro de transcripciones")
     search.add_argument("query")
     search.add_argument("--video", dest="video_id")
-    search.add_argument("--limit", type=int, default=10)
-    search.add_argument("--context", type=int, default=0)
+    search.add_argument("--limit", type=positive_int, default=10)
+    search.add_argument("--context", type=nonnegative_int, default=0)
     search.add_argument("--out", default="data/videos")
 
     analyze = sub.add_parser("analyze", help="Reanalizar un video ya descargado sin usar red")
@@ -228,11 +247,7 @@ def main() -> None:
 
     args = parser.parse_args(argv)
     if args.command == "study":
-        try:
-            video_dir = process_video(args.url, Path(args.out), args.lang, force_download=args.force_download, quiet=args.quiet)
-        except (RuntimeError, FileNotFoundError) as exc:
-            print(f"Error: {exc}", file=sys.stderr)
-            raise SystemExit(1) from exc
+        video_dir = process_video(args.url, Path(args.out), args.lang, force_download=args.force_download, quiet=args.quiet)
         print("\nArchivos generados:")
         for path in sorted(video_dir.iterdir()):
             print(f"- {path}")
@@ -252,30 +267,32 @@ def main() -> None:
         videos_dir = Path(args.out)
         library_path = library_path_from_videos_dir(videos_dir)
         videos = list_videos(library_path)
+        if args.video_id and not any(str(video.get("id") or "") == args.video_id for video in videos):
+            raise VideoDataError(f"No existe el video {args.video_id} en la biblioteca.")
         results = search_library(videos, args.query, video_id=args.video_id, limit=args.limit, context=args.context, library_path=library_path)
         print_search_results(results)
     elif args.command == "analyze":
-        try:
-            video_dir = analyze_existing(args.video_id, Path(args.out), args.lang)
-        except FileNotFoundError as exc:
-            print(f"Error: {exc}", file=sys.stderr)
-            raise SystemExit(1) from exc
+        video_dir = analyze_existing(args.video_id, Path(args.out), args.lang)
         print("\nArchivos regenerados:")
         for path in sorted(video_dir.iterdir()):
             print(f"- {path}")
     elif args.command == "export":
-        try:
-            paths = export_study(args.video_id, Path(args.out), args.lang, args.format)
-        except FileNotFoundError as exc:
-            print(f"Error: {exc}", file=sys.stderr)
-            raise SystemExit(1) from exc
+        paths = export_study(args.video_id, Path(args.out), args.lang, args.format)
         print("\nArchivos exportados:")
         for path in paths:
             print(f"- {path}")
     else:
         parser.print_help()
-        return
+    return 0
+
+
+def main() -> int:
+    try:
+        return run(sys.argv[1:])
+    except (AppError, LibraryError, OSError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

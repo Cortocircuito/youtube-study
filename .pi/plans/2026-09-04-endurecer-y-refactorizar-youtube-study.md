@@ -2,7 +2,7 @@
 title: "Endurecer y refactorizar YouTube Study"
 status: in_progress
 created: "2026-09-04T15:46:11.517Z"
-updated: "2026-09-04T15:58:39.050Z"
+updated: "2026-09-12T00:55:10.729Z"
 type: refactor
 ---
 
@@ -69,7 +69,7 @@ Criterio de aceptación: interrupción o JSON corrupto no destruye biblioteca re
 
 ⏸️ PAUSE — Revisar respaldo, formato final y portabilidad de rutas.
 
-## Fase 2 — Contrato CLI y manejo uniforme de errores (prioridad alta)
+## Fase 2 — Contrato CLI y manejo uniforme de errores (prioridad alta) [DONE:5]
 
 1. Crear excepciones de aplicación (`LibraryError`, `VideoDataError`, `SubtitleError`) sin mostrar tracebacks al usuario en errores esperables.
 2. Validar con `argparse` que `--limit >= 1` y `--context >= 0`.
@@ -77,12 +77,14 @@ Criterio de aceptación: interrupción o JSON corrupto no destruye biblioteca re
 4. Centralizar impresión de errores y códigos de salida en `main()`.
 5. Probar comandos exitosos y fallidos mediante `subprocess`, incluyendo el atajo `python app.py URL` sin efectuar red mediante mocks.
 
-Verificación:
+Verificación ejecutada:
 
 ```bash
 .venv/bin/python app.py search test --limit 0
 .venv/bin/python app.py show VIDEO_INEXISTENTE
 .venv/bin/python -m pytest tests/test_cli.py
+.venv/bin/python -m py_compile app.py src/youtube_study/*.py
+.venv/bin/python -m pytest
 ```
 
 Criterio de aceptación: entradas inválidas fallan de forma predecible, sin traceback y con exit code no cero.

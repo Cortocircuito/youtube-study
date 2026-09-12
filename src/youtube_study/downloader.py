@@ -8,6 +8,8 @@ from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
 from yt_dlp.version import __version__ as YTDLP_VERSION
 
+from .errors import SubtitleError
+
 MIN_YTDLP_VERSION = (2025, 1, 1)
 
 
@@ -53,12 +55,12 @@ def download_subtitles(
         with YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
     except DownloadError as exc:
-        raise RuntimeError(
+        raise SubtitleError(
             "No se pudieron descargar los subtítulos. Comprueba la URL, los idiomas solicitados, "
             "los límites de YouTube y que yt-dlp esté actualizado en el venv."
         ) from exc
     if not info:
-        raise RuntimeError("YouTube no devolvió información para el video solicitado.")
+        raise SubtitleError("YouTube no devolvió información para el video solicitado.")
     return info
 
 
@@ -66,7 +68,7 @@ def choose_vtt(video_dir: Path, video_id: str, preferred_langs: list[str]) -> Pa
     """Choose captions by quality: Spanish manual, Spanish auto-original, translated, English."""
     all_vtts = sorted(video_dir.glob(f"{video_id}.*.vtt"))
     if not all_vtts:
-        raise FileNotFoundError(
+        raise SubtitleError(
             f"No se descargó ningún subtítulo .vtt en {video_dir}. "
             "Prueba otros idiomas con --lang o verifica que el video tenga subtítulos."
         )
