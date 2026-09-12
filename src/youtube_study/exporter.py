@@ -4,19 +4,33 @@ import csv
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 from .analyzer import ConceptMention, ToolMention, flatten_questions
 from .transcript import Cue, as_text, chunk_by_minutes
 
 
-def write_info(path: Path, info: dict, subtitle: Path) -> None:
+def _source_subtitle_payload(subtitle: Any) -> str | dict[str, Any]:
+    if all(hasattr(subtitle, attr) for attr in ("path", "language", "kind", "reason")):
+        return {
+            "path": str(subtitle.path),
+            "language": subtitle.language,
+            "kind": subtitle.kind,
+            "reason": subtitle.reason,
+            "is_translation": bool(getattr(subtitle, "is_translation", False)),
+            "source_language": getattr(subtitle, "source_language", None),
+        }
+    return str(subtitle)
+
+
+def write_info(path: Path, info: dict, subtitle: Any) -> None:
     payload = {
         "id": info.get("id"),
         "title": info.get("title"),
         "uploader": info.get("uploader"),
         "duration": info.get("duration"),
         "webpage_url": info.get("webpage_url"),
-        "source_subtitle": str(subtitle),
+        "source_subtitle": _source_subtitle_payload(subtitle),
     }
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 

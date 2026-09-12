@@ -17,7 +17,7 @@ from src.youtube_study.analyzer import (
     questions,
     section_summaries,
 )
-from src.youtube_study.downloader import choose_vtt, download_subtitles
+from src.youtube_study.downloader import SubtitleSelection, choose_subtitle, download_subtitles
 from src.youtube_study.errors import AppError, VideoDataError
 from src.youtube_study.exporter import (
     write_clean_transcript,
@@ -111,9 +111,9 @@ def print_search_results(results: list[SearchResult]) -> None:
         print()
 
 
-def generate_study_files(info: dict, video_dir: Path, subtitle: Path, library_path: Path) -> Path:
+def generate_study_files(info: dict, video_dir: Path, subtitle: SubtitleSelection, library_path: Path) -> Path:
     video_id = info["id"]
-    cues = clean_vtt(subtitle)
+    cues = clean_vtt(subtitle.path)
     text = full_text(cues)
 
     kws = keywords(text)
@@ -145,11 +145,11 @@ def process_video(url: str, out: Path, langs: str, *, force_download: bool = Fal
     info = download_subtitles(url, out, langs, force_download=force_download, quiet=quiet)
     video_id = info["id"]
     video_dir = out / video_id
-    subtitle = choose_vtt(video_dir, video_id, [x.strip() for x in langs.split(",") if x.strip()])
+    subtitle = choose_subtitle(video_dir, video_id, [x.strip() for x in langs.split(",") if x.strip()], info=info)
     return generate_study_files(info, video_dir, subtitle, library_path_from_videos_dir(out))
 
 
-def load_existing_video(video_id: str, out: Path, langs: str) -> tuple[dict, Path, Path]:
+def load_existing_video(video_id: str, out: Path, langs: str) -> tuple[dict, Path, SubtitleSelection]:
     video_dir = out / video_id
     if not video_dir.exists():
         raise VideoDataError(f"No existe el directorio del video: {video_dir}")
@@ -163,7 +163,7 @@ def load_existing_video(video_id: str, out: Path, langs: str) -> tuple[dict, Pat
     if not isinstance(info, dict):
         raise VideoDataError(f"info.json inválido para {video_id}: se esperaba un objeto JSON")
     info.setdefault("id", video_id)
-    subtitle = choose_vtt(video_dir, video_id, [x.strip() for x in langs.split(",") if x.strip()])
+    subtitle = choose_subtitle(video_dir, video_id, [x.strip() for x in langs.split(",") if x.strip()], info=info)
     return info, video_dir, subtitle
 
 
@@ -180,7 +180,7 @@ def export_study(video_id: str, out: Path, langs: str, export_format: str) -> li
         write_study_markdown(study_path, video_dir, info.get("title", video_id))
         written.append(study_path)
     if export_format in {"anki", "all"}:
-        cues = clean_vtt(subtitle)
+        cues = clean_vtt(subtitle.path)
         tools = detect_tools(full_text(cues))
         cards = flashcards(tools, questions(cues, tools))
         anki_path = video_dir / "anki.csv"

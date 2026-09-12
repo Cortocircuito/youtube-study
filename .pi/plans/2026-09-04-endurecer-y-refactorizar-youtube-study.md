@@ -2,7 +2,7 @@
 title: "Endurecer y refactorizar YouTube Study"
 status: in_progress
 created: "2026-09-04T15:46:11.517Z"
-updated: "2026-09-12T00:55:10.729Z"
+updated: "2026-09-12T01:08:11.783Z"
 type: refactor
 ---
 
@@ -91,7 +91,7 @@ Criterio de aceptación: entradas inválidas fallan de forma predecible, sin tra
 
 ⏸️ PAUSE — Validar mensajes y códigos de salida.
 
-## Fase 3 — Selección y descarga fiable de subtítulos (prioridad alta)
+## Fase 3 — Selección y descarga fiable de subtítulos (prioridad alta) [DONE:5]
 
 1. Separar inventario de subtítulos manuales y automáticos usando metadata de `yt-dlp` (`subtitles` y `automatic_captions`), sin inferir origen únicamente por nombre.
 2. Definir política explícita y comprobable: manual en idioma solicitado, automático original solicitado, traducción solicitada, inglés, fallback controlado.
@@ -99,11 +99,13 @@ Criterio de aceptación: entradas inválidas fallan de forma predecible, sin tra
 4. Añadir tests sin red para orden de idiomas, ausencia de subtítulos, `--force-download`, `--quiet` y traducciones.
 5. Documentar qué subtítulo se eligió y por qué en `info.json` (`source_subtitle`, idioma y tipo).
 
-Verificación:
+Verificación ejecutada:
 
 ```bash
+.venv/bin/python -m py_compile app.py src/youtube_study/*.py
 .venv/bin/python -m pytest tests/test_downloader.py
 .venv/bin/python app.py analyze Yj51wXMwFwE
+.venv/bin/python -m pytest
 ```
 
 Criterio de aceptación: selección coincide con política en fixtures; documentación deja de prometer distinción no garantizada.
