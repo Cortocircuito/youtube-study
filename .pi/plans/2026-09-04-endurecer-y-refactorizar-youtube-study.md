@@ -134,7 +134,7 @@ Criterio de aceptación: todos los archivos de una ejecución representan mismo 
 
 ⏸️ PAUSE — Comparar metadata/versiones de artefactos.
 
-## Fase 5 — Refactor arquitectónico sin cambio funcional (prioridad media)
+## Fase 5 — Refactor arquitectónico sin cambio funcional (prioridad media) [DONE:5]
 
 1. Extraer pipeline de `app.py` a `src/youtube_study/service.py` o `pipeline.py`.
 2. Extraer construcción/parsing CLI y presentación a `src/youtube_study/cli.py`; dejar `app.py` como entrypoint mínimo.
@@ -142,11 +142,12 @@ Criterio de aceptación: todos los archivos de una ejecución representan mismo 
 4. Reducir duplicación en opciones comunes `--out`/`--lang` y formateo de resultados.
 5. Ejecutar suite completa y comparar salidas CLI principales antes/después.
 
-Verificación:
+Verificación ejecutada:
 
 ```bash
 .venv/bin/python app.py --help
 .venv/bin/python app.py list
+.venv/bin/python -m py_compile app.py src/youtube_study/*.py
 .venv/bin/python -m pytest
 ```
 

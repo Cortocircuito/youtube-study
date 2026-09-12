@@ -12,6 +12,7 @@ from typing import Any
 
 from .analyzer import ToolMention
 from .errors import AppError
+from .models import LibraryEntry, VideoInfo
 
 
 class LibraryError(AppError):
@@ -120,11 +121,11 @@ def resolve_video_path(library_path: Path, stored_path: str | Path) -> Path:
     return data_dir / candidate
 
 
-def list_videos(path: Path) -> list[dict[str, Any]]:
+def list_videos(path: Path) -> list[LibraryEntry]:
     return load_library(path).get("videos", [])
 
 
-def get_video(path: Path, video_id: str) -> dict[str, Any] | None:
+def get_video(path: Path, video_id: str) -> LibraryEntry | None:
     for video in list_videos(path):
         if video.get("id") == video_id:
             return video
@@ -132,13 +133,13 @@ def get_video(path: Path, video_id: str) -> dict[str, Any] | None:
 
 
 def _video_entry(
-    info: dict[str, Any],
+    info: VideoInfo,
     video_dir: Path,
     library_path: Path,
     tools: list[str],
     created_at: str,
     updated_at: str,
-) -> dict[str, Any]:
+) -> LibraryEntry:
     video_id = info.get("id")
     if not video_id:
         raise LibraryError("No se puede registrar video sin id")
@@ -155,7 +156,7 @@ def _video_entry(
     }
 
 
-def upsert_video(path: Path, info: dict[str, Any], video_dir: Path, tools: list[ToolMention]) -> dict[str, Any]:
+def upsert_video(path: Path, info: VideoInfo, video_dir: Path, tools: list[ToolMention]) -> LibraryEntry:
     """Insert or update one video in the local library, deduplicated by id."""
     data = load_library(path)
     now = utc_now()

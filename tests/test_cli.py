@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-import app
+from src.youtube_study import cli
 
 
 def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
@@ -141,8 +141,8 @@ def test_url_shortcut_invokes_study_command(monkeypatch, tmp_path: Path, capsys)
         calls.append((url, out, lang))
         return generated
 
-    monkeypatch.setattr(app, "process_video", fake_process_video)
+    monkeypatch.setattr(cli, "process_video", fake_process_video)
 
-    assert app.run(["https://youtu.be/example", "--out", str(tmp_path / "videos")]) == 0
+    assert cli.run(["https://youtu.be/example", "--out", str(tmp_path / "videos")]) == 0
     assert calls == [("https://youtu.be/example", tmp_path / "videos", "es-419,es,es-orig")]
     assert "Archivos generados" in capsys.readouterr().out

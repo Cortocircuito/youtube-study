@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import app
 from src.youtube_study.downloader import SubtitleSelection
+from src.youtube_study.service import export_study, generate_study_files
 
 
 def write_demo_vtt(path: Path) -> None:
@@ -30,7 +30,7 @@ def test_generate_study_files_writes_all_artifacts_from_one_analysis(tmp_path: P
         reason="subtítulo manual en idioma solicitado",
     )
 
-    app.generate_study_files(
+    generate_study_files(
         {"id": "demo", "title": "Demo Ñ", "uploader": "Canal Ñ"},
         video_dir,
         selection,
@@ -82,7 +82,7 @@ def test_export_study_recomputes_markdown_and_anki_from_subtitle(tmp_path: Path)
     (video_dir / "summary.md").write_text("# Resumen\n\nCONTENIDO OBSOLETO", encoding="utf-8")
     (video_dir / "study.md").write_text("CONTENIDO OBSOLETO", encoding="utf-8")
 
-    written = app.export_study("demo", tmp_path / "videos", "es", "all")
+    written = export_study("demo", tmp_path / "videos", "es", "all")
 
     assert [path.name for path in written] == ["study.md", "anki.csv"]
     study = (video_dir / "study.md").read_text(encoding="utf-8")
