@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -49,6 +50,85 @@ def test_analyze_invalid_info_json_returns_error(tmp_path: Path) -> None:
     assert result.returncode == 1
     assert "info.json inválido" in result.stderr
     assert "Traceback" not in result.stderr
+
+
+def test_help_is_available() -> None:
+    result = run_cli("--help")
+
+    assert result.returncode == 0
+    assert "Descarga transcripciones de YouTube" in result.stdout
+    assert "rebuild-library" in result.stdout
+
+
+def test_list_and_show_successfully_display_library_entry(tmp_path: Path) -> None:
+    videos_dir = tmp_path / "data" / "videos"
+    video_dir = videos_dir / "demo"
+    video_dir.mkdir(parents=True)
+    library = {
+        "videos": [
+            {
+                "id": "demo",
+                "title": "Video de prueba",
+                "channel": "Canal de prueba",
+                "duration": 65,
+                "url": "https://example.test/demo",
+                "path": "videos/demo",
+                "tools": ["ssh"],
+                "created_at": "2026-01-01T00:00:00+00:00",
+                "updated_at": "2026-01-01T00:00:00+00:00",
+            }
+        ]
+    }
+    (tmp_path / "data" / "library.json").write_text(json.dumps(library), encoding="utf-8")
+    (video_dir / "summary.md").write_text("# Resumen", encoding="utf-8")
+
+    listed = run_cli("list", "--out", str(videos_dir))
+    shown = run_cli("show", "demo", "--out", str(videos_dir))
+
+    assert listed.returncode == 0
+    assert "demo | 1:05 | Video de prueba" in listed.stdout
+    assert "Herramientas: ssh" in listed.stdout
+    assert shown.returncode == 0
+    assert "Título: Video de prueba" in shown.stdout
+    assert "- summary.md" in shown.stdout
+
+
+def test_rebuild_library_command_creates_and_lists_video(tmp_path: Path) -> None:
+    videos_dir = tmp_path / "data" / "videos"
+    video_dir = videos_dir / "demo"
+    video_dir.mkdir(parents=True)
+    (video_dir / "info.json").write_text(json.dumps({"id": "demo", "title": "Reconstruido"}), encoding="utf-8")
+
+    rebuilt = run_cli("rebuild-library", "--out", str(videos_dir))
+    listed = run_cli("list", "--out", str(videos_dir))
+
+    assert rebuilt.returncode == 0
+    assert "Biblioteca reconstruida: 1 videos." in rebuilt.stdout
+    assert listed.returncode == 0
+    assert "Reconstruido" in listed.stdout
+
+
+def test_analyze_and_export_successfully_via_cli(tmp_path: Path) -> None:
+    videos_dir = tmp_path / "videos"
+    video_dir = videos_dir / "demo"
+    video_dir.mkdir(parents=True)
+    (video_dir / "demo.es.vtt").write_text(
+        "WEBVTT\n\n00:00:01.000 --> 00:00:03.000\n"
+        "Tailscale permite usar SSH sin abrir puertos.\n",
+        encoding="utf-8",
+    )
+    (video_dir / "info.json").write_text(json.dumps({"id": "demo", "title": "Demo", "uploader": "Canal"}), encoding="utf-8")
+
+    analyzed = run_cli("analyze", "demo", "--out", str(videos_dir))
+    exported = run_cli("export", "demo", "--format", "all", "--out", str(videos_dir))
+
+    assert analyzed.returncode == 0
+    assert "Archivos regenerados" in analyzed.stdout
+    assert (video_dir / "tools.json").exists()
+    assert exported.returncode == 0
+    assert "Archivos exportados" in exported.stdout
+    assert (video_dir / "study.md").exists()
+    assert (video_dir / "anki.csv").exists()
 
 
 def test_url_shortcut_invokes_study_command(monkeypatch, tmp_path: Path, capsys) -> None:
