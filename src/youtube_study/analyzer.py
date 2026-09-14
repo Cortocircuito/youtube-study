@@ -49,7 +49,6 @@ class ConceptMention:
 @dataclass
 class AnalysisResult:
     cues: list[Cue]
-    text: str
     keywords: list[tuple[str, int]]
     tools: list[ToolMention]
     ideas: list[tuple[str, str]]
@@ -208,7 +207,6 @@ def analyze_cues(cues: list[Cue]) -> AnalysisResult:
     qs = questions(cues, tools)
     return AnalysisResult(
         cues=cues,
-        text=text,
         keywords=keywords(text),
         tools=tools,
         ideas=important_ideas(cues),

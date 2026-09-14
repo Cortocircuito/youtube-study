@@ -174,27 +174,6 @@ def write_study_markdown_from_result(path: Path, title: str, result: AnalysisRes
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def write_study_markdown(path: Path, video_dir: Path, title: str) -> None:
-    """Create one portable Markdown file from generated Markdown materials (legacy helper)."""
-    sections = [
-        ("summary.md", "Resumen"),
-        ("tools.md", "Herramientas"),
-        ("concepts.md", "Conceptos"),
-        ("questions.md", "Preguntas"),
-        ("flashcards.md", "Flashcards"),
-    ]
-    lines = [f"# Estudio consolidado: {title}", ""]
-    for filename, fallback_title in sections:
-        source = video_dir / filename
-        if not source.exists():
-            continue
-        content = source.read_text(encoding="utf-8").strip()
-        if content.startswith("# "):
-            content = content.split("\n", 1)[1].lstrip() if "\n" in content else ""
-        lines += [f"## {fallback_title}", "", content, ""]
-    path.write_text("\n".join(lines), encoding="utf-8")
-
-
 def write_anki_csv(path: Path, cards: list[dict[str, str]], video_id: str, channel: str | None = None) -> None:
     """Write UTF-8 CSV ready for Anki import: Front, Back, Tags."""
     path.parent.mkdir(parents=True, exist_ok=True)

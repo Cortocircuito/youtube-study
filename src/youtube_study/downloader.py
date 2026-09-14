@@ -311,8 +311,3 @@ def choose_subtitle(
         is_translation=fallback.is_translation,
         source_language=fallback.source_language,
     )
-
-
-def choose_vtt(video_dir: Path, video_id: str, preferred_langs: list[str], info: dict[str, Any] | None = None) -> Path:
-    """Backward-compatible helper that returns only the selected VTT path."""
-    return choose_subtitle(video_dir, video_id, preferred_langs, info=info).path
