@@ -113,11 +113,12 @@ def test_analyze_and_export_successfully_via_cli(tmp_path: Path) -> None:
     video_dir = videos_dir / "demo"
     video_dir.mkdir(parents=True)
     (video_dir / "demo.es.vtt").write_text(
-        "WEBVTT\n\n00:00:01.000 --> 00:00:03.000\n"
-        "Tailscale permite usar SSH sin abrir puertos.\n",
+        "WEBVTT\n\n00:00:01.000 --> 00:00:03.000\nTailscale permite usar SSH sin abrir puertos.\n",
         encoding="utf-8",
     )
-    (video_dir / "info.json").write_text(json.dumps({"id": "demo", "title": "Demo", "uploader": "Canal"}), encoding="utf-8")
+    (video_dir / "info.json").write_text(
+        json.dumps({"id": "demo", "title": "Demo", "uploader": "Canal"}), encoding="utf-8"
+    )
 
     analyzed = run_cli("analyze", "demo", "--out", str(videos_dir))
     exported = run_cli("export", "demo", "--format", "all", "--out", str(videos_dir))
@@ -137,7 +138,9 @@ def test_url_shortcut_invokes_study_command(monkeypatch, tmp_path: Path, capsys)
     (generated / "summary.md").write_text("# Resumen", encoding="utf-8")
     calls: list[tuple[str, Path, str]] = []
 
-    def fake_process_video(url: str, out: Path, lang: str, *, force_download: bool = False, quiet: bool = False) -> Path:
+    def fake_process_video(
+        url: str, out: Path, lang: str, *, force_download: bool = False, quiet: bool = False
+    ) -> Path:
         calls.append((url, out, lang))
         return generated
 

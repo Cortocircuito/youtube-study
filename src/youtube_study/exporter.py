@@ -78,7 +78,13 @@ def write_tools(path: Path, tools: list[ToolMention]) -> None:
 
 def write_tools_json(path: Path, tools: list[ToolMention]) -> None:
     payload = [
-        {"name": tool.name, "count": tool.count, "description": tool.description, "category": tool.category, "kind": tool.kind}
+        {
+            "name": tool.name,
+            "count": tool.count,
+            "description": tool.description,
+            "category": tool.category,
+            "kind": tool.kind,
+        }
         for tool in tools
     ]
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -101,7 +107,13 @@ def write_concepts_json(path: Path, concepts: list[ConceptMention]) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def write_summary(path: Path, title: str, keywords: list[tuple[str, int]], ideas: list[tuple[str, str]], sections: list[tuple[str, str, list[str]]]) -> None:
+def write_summary(
+    path: Path,
+    title: str,
+    keywords: list[tuple[str, int]],
+    ideas: list[tuple[str, str]],
+    sections: list[tuple[str, str, list[str]]],
+) -> None:
     lines = [f"# Resumen de estudio: {title}", "", "## Palabras clave", ""]
     lines += [f"- {w}: {n}" for w, n in keywords[:15]]
     lines += ["", "## Ideas importantes con timestamp", ""]
@@ -184,13 +196,33 @@ def write_anki_csv(path: Path, cards: list[dict[str, str]], video_id: str, chann
         writer.writerow(["Front", "Back", "Tags"])
         channel_tag = re.sub(r"\s+", "_", channel.strip()) if channel else ""
         for card in cards:
-            tags = " ".join(part for part in [f"video::{video_id}", f"channel::{channel_tag}" if channel_tag else "", card.get("tags", "")] if part)
+            tags = " ".join(
+                part
+                for part in [
+                    f"video::{video_id}",
+                    f"channel::{channel_tag}" if channel_tag else "",
+                    card.get("tags", ""),
+                ]
+                if part
+            )
             writer.writerow([card["question"], card["answer"], tags])
 
 
 def write_study_guide(path: Path, title: str, tools: list[ToolMention], questions: dict[str, list[str]]) -> None:
     lines = [f"# Guía de estudio: {title}", "", "## 1. Qué debes entender", ""]
     lines += [f"- {tool.name}: {tool.description}" for tool in tools[:8]]
-    lines += ["", "## 2. Cómo estudiar el video", "", "1. Lee primero `summary.md`.", "2. Revisa `tools.md` para identificar herramientas.", "3. Lee `concepts.md` por bloques de tiempo.", "4. Contesta `questions.md` sin mirar la transcripción.", "5. Repasa con `flashcards.md`.", "", "## 3. Preguntas clave", ""]
+    lines += [
+        "",
+        "## 2. Cómo estudiar el video",
+        "",
+        "1. Lee primero `summary.md`.",
+        "2. Revisa `tools.md` para identificar herramientas.",
+        "3. Lee `concepts.md` por bloques de tiempo.",
+        "4. Contesta `questions.md` sin mirar la transcripción.",
+        "5. Repasa con `flashcards.md`.",
+        "",
+        "## 3. Preguntas clave",
+        "",
+    ]
     lines += [f"- {q}" for q in flatten_questions(questions)[:8]]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")

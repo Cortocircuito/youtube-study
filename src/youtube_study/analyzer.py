@@ -9,9 +9,18 @@ from .transcript import Cue, chunk_by_minutes
 
 ANALYSIS_FORMAT_VERSION = 1
 
-STOPWORDS = set("""
-a acá ahí al algo algunas algunos ante antes aquí así aunque cada casi como con contra cual cuando de del desde donde dos e el ella ellas ellos en entre era eran es esa esas ese eso esos esta estaba están estar estas esté este esto estos fue han hasta hay la las le les lo los más me mi mis muy no nos o para pero por porque que se ser si sin sobre son su sus te tenía tienen tenemos todo todos tu un una unas unos y ya yo bien entonces ejemplo ahora ver voy vos qué cómo cosa cosas hacer ahí acá directamente caso gente tener tiene tengo está estoy estás estamos están vas vamos puedo podés podes puede pueden podría verdad realmente mostrar miren vean después acá abajo arriba también qr sim
-""".split())
+STOPWORDS = set(
+    """
+    a acá ahí al algo algunas algunos ante antes aquí así aunque cada casi como con contra cual cuando
+    de del desde donde dos e el ella ellas ellos en entre era eran es esa esas ese eso esos esta estaba
+    están estar estas esté este esto estos fue han hasta hay la las le les lo los más me mi mis muy no
+    nos o para pero por porque que se ser si sin sobre son su sus te tenía tienen tenemos todo todos tu
+    un una unas unos y ya yo bien entonces ejemplo ahora ver voy vos qué cómo cosa cosas hacer ahí acá
+    directamente caso gente tener tiene tengo está estoy estás estamos están vas vamos puedo podés podes
+    puede pueden podría verdad realmente mostrar miren vean después acá abajo arriba también qr sim
+    """.split()
+)
+
 
 @dataclass
 class ToolMention:
@@ -59,8 +68,7 @@ def detect_tools(text: str) -> list[ToolMention]:
     for name, tool in TOOL_CATALOG.items():
         aliases = [name, *tool.get("aliases", [])]
         count = sum(
-            len(re.findall(r"(?<![\w.-])" + re.escape(alias.lower()) + r"(?![\w.-])", lower))
-            for alias in aliases
+            len(re.findall(r"(?<![\w.-])" + re.escape(alias.lower()) + r"(?![\w.-])", lower)) for alias in aliases
         )
         if count:
             mentions.append(
@@ -85,7 +93,13 @@ def detect_unknown_tools(text: str, known_names: set[str], limit: int = 8) -> li
     results: list[ToolMention] = []
     for name, count in counts.most_common():
         normalized = name.lower().strip(".-")
-        if normalized in known_names or normalized in STOPWORDS or normalized in UNKNOWN_CANDIDATE_EXCLUSIONS or name in ignored or count < 2:
+        if (
+            normalized in known_names
+            or normalized in STOPWORDS
+            or normalized in UNKNOWN_CANDIDATE_EXCLUSIONS
+            or name in ignored
+            or count < 2
+        ):
             continue
         results.append(
             ToolMention(
@@ -114,13 +128,28 @@ def important_ideas(cues: list[Cue], limit: int = 12) -> list[tuple[str, str]]:
     # Agrupamos varias líneas de subtítulos para evitar frases cortadas.
     grouped: list[tuple[str, str]] = []
     for i in range(0, len(cues), 3):
-        chunk = cues[i:i + 3]
+        chunk = cues[i : i + 3]
         if not chunk:
             continue
         grouped.append((chunk[0].start, " ".join(c.text for c in chunk)))
 
     scored: list[tuple[float, str, str]] = []
-    priority = ["instal", "config", "ssh", "tailscale", "puerto", "llave", "teléfono", "notificacion", "agente", "multiplex", "hook", "qr", "token", "firewall"]
+    priority = [
+        "instal",
+        "config",
+        "ssh",
+        "tailscale",
+        "puerto",
+        "llave",
+        "teléfono",
+        "notificacion",
+        "agente",
+        "multiplex",
+        "hook",
+        "qr",
+        "token",
+        "firewall",
+    ]
     for ts, sent in grouped:
         low = sent.lower()
         ws = re.findall(r"[a-záéíóúñü0-9_.-]{3,}", low)
@@ -187,11 +216,21 @@ def flatten_questions(qs: dict[str, list[str]]) -> list[str]:
 
 def flashcards(tools: list[ToolMention], qs: dict[str, list[str]]) -> list[dict[str, str]]:
     cards = [
-        {"question": f"¿Qué es {tool.name}?", "answer": tool.description, "tags": f"tool {tool.category} {tool.kind} {tool.name}"}
+        {
+            "question": f"¿Qué es {tool.name}?",
+            "answer": tool.description,
+            "tags": f"tool {tool.category} {tool.kind} {tool.name}",
+        }
         for tool in tools[:10]
     ]
     for q in flatten_questions(qs)[:5]:
-        cards.append({"question": q, "answer": "Respóndelo usando la sección correspondiente de la transcripción.", "tags": "question review"})
+        cards.append(
+            {
+                "question": q,
+                "answer": "Respóndelo usando la sección correspondiente de la transcripción.",
+                "tags": "question review",
+            }
+        )
     return cards
 
 

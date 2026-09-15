@@ -93,7 +93,11 @@ def _language_base(language: str) -> str:
 def _language_matches(candidate_language: str, requested_language: str) -> bool:
     candidate = candidate_language.lower()
     requested = requested_language.lower()
-    return candidate == requested or candidate == f"{requested}-orig" or _language_base(candidate) == _language_base(requested)
+    return (
+        candidate == requested
+        or candidate == f"{requested}-orig"
+        or _language_base(candidate) == _language_base(requested)
+    )
 
 
 def _language_rank(candidate_language: str, requested_language: str) -> int:
@@ -187,7 +191,9 @@ def subtitle_inventory(info: dict[str, Any] | None, video_dir: Path, video_id: s
     return sorted(candidates_by_path.values(), key=lambda candidate: candidate.path.name)
 
 
-def _selection_from_info(info: dict[str, Any] | None, video_dir: Path, preferred_langs: list[str]) -> SubtitleSelection | None:
+def _selection_from_info(
+    info: dict[str, Any] | None, video_dir: Path, preferred_langs: list[str]
+) -> SubtitleSelection | None:
     if not isinstance(info, dict):
         return None
     source = info.get("source_subtitle")
@@ -231,7 +237,9 @@ def _select_for_requested(
             and (translation is None or candidate.is_translation is translation)
         ]
         if matches:
-            selected = min(matches, key=lambda candidate: (_language_rank(candidate.language, requested), candidate.path.name))
+            selected = min(
+                matches, key=lambda candidate: (_language_rank(candidate.language, requested), candidate.path.name)
+            )
             return SubtitleSelection(
                 path=selected.path,
                 language=selected.language,
@@ -248,7 +256,9 @@ def _select_english(candidates: list[SubtitleCandidate]) -> SubtitleSelection | 
     if not matches:
         return None
     kind_rank = {"manual": 0, "automatic": 1, "unknown": 2}
-    selected = min(matches, key=lambda candidate: (kind_rank.get(candidate.kind, 3), candidate.is_translation, candidate.path.name))
+    selected = min(
+        matches, key=lambda candidate: (kind_rank.get(candidate.kind, 3), candidate.is_translation, candidate.path.name)
+    )
     return SubtitleSelection(
         path=selected.path,
         language=selected.language,

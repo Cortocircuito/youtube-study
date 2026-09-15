@@ -105,9 +105,9 @@ def remove_rolling_overlaps(cues: list[Cue]) -> list[Cue]:
         words = cue.text.split()
         if not words:
             continue
-        previous_norm = [word.lower().strip(".,;:!?¿¡()[]{}\"") for word in previous_words]
-        words_norm = [word.lower().strip(".,;:!?¿¡()[]{}\"") for word in words]
-        if words_norm == previous_norm or (previous_norm and previous_norm[-len(words_norm):] == words_norm):
+        previous_norm = [word.lower().strip('.,;:!?¿¡()[]{}"') for word in previous_words]
+        words_norm = [word.lower().strip('.,;:!?¿¡()[]{}"') for word in words]
+        if words_norm == previous_norm or (previous_norm and previous_norm[-len(words_norm) :] == words_norm):
             continue
         # Remove overlap between previous tail and current head, ignoring punctuation/case.
         overlap = 0
@@ -141,10 +141,14 @@ def chunk_by_minutes(cues: list[Cue], minutes: int = 5) -> list[tuple[str, str, 
     for cue in cues:
         sec = seconds_from_timestamp(cue.start)
         while sec >= bucket_start + size and bucket:
-            chunks.append((timestamp_from_seconds(bucket_start), timestamp_from_seconds(bucket_start + size), " ".join(bucket)))
+            chunks.append(
+                (timestamp_from_seconds(bucket_start), timestamp_from_seconds(bucket_start + size), " ".join(bucket))
+            )
             bucket = []
             bucket_start += size
         bucket.append(cue.text)
     if bucket:
-        chunks.append((timestamp_from_seconds(bucket_start), timestamp_from_seconds(bucket_start + size), " ".join(bucket)))
+        chunks.append(
+            (timestamp_from_seconds(bucket_start), timestamp_from_seconds(bucket_start + size), " ".join(bucket))
+        )
     return chunks

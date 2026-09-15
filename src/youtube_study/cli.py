@@ -147,7 +147,9 @@ def run(argv: list[str]) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "study":
-        video_dir = process_video(args.url, Path(args.out), args.lang, force_download=args.force_download, quiet=args.quiet)
+        video_dir = process_video(
+            args.url, Path(args.out), args.lang, force_download=args.force_download, quiet=args.quiet
+        )
         print("\nArchivos generados:")
         for path in sorted(video_dir.iterdir()):
             print(f"- {path}")
@@ -169,7 +171,14 @@ def run(argv: list[str]) -> int:
         videos = list_videos(library_path)
         if args.video_id and not any(str(video.get("id") or "") == args.video_id for video in videos):
             raise VideoDataError(f"No existe el video {args.video_id} en la biblioteca.")
-        results = search_library(videos, args.query, video_id=args.video_id, limit=args.limit, context=args.context, library_path=library_path)
+        results = search_library(
+            videos,
+            args.query,
+            video_id=args.video_id,
+            limit=args.limit,
+            context=args.context,
+            library_path=library_path,
+        )
         print_search_results(results)
     elif args.command == "analyze":
         video_dir = analyze_existing(args.video_id, Path(args.out), args.lang)

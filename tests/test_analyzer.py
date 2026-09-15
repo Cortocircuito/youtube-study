@@ -3,7 +3,6 @@ from pathlib import Path
 from src.youtube_study.analyzer import concept_mentions, detect_tools, detect_unknown_tools
 from src.youtube_study.transcript import Cue
 
-
 FIXTURE = Path(__file__).parent / "fixtures" / "heuristics.txt"
 
 

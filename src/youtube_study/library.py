@@ -55,7 +55,7 @@ def load_library(path: Path) -> dict[str, Any]:
     try:
         with path.open("r", encoding="utf-8") as file:
             data = json.load(file)
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, json.JSONDecodeError):
         try:
             backup = _backup_invalid_library(path)
         except OSError as backup_error:
@@ -88,7 +88,9 @@ def save_library(path: Path, data: dict[str, Any]) -> None:
     payload = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
     temp_name: str | None = None
     try:
-        with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", delete=False) as file:
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", delete=False
+        ) as file:
             temp_name = file.name
             file.write(payload)
             file.flush()

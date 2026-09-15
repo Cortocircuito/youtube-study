@@ -2,7 +2,7 @@
 title: "Endurecer y refactorizar YouTube Study"
 status: in_progress
 created: "2026-09-04T15:46:11.517Z"
-updated: "2026-09-15T02:42:54.518Z"
+updated: "2026-09-15T02:55:49.462Z"
 type: refactor
 ---
 
@@ -157,6 +157,28 @@ Criterio de aceptación: `app.py` solo inicia CLI; no cambia contrato público.
 
 ## Fase 6 — Calidad heurística medible (prioridad media)
 
+1. Se añadieron fixtures breves y etiquetados en `tests/fixtures/heuristics.txt` y pruebas en `tests/test_analyzer.py` para herramientas conocidas, categorías, falsos positivos y conceptos.
+2. `ToolMention` ahora distingue categoría (`tool`, `protocol`, `model`, `service` o `candidate`) y procedencia (`known`/`unknown`).
+3. El catálogo y aliases de detección salieron de `analyzer.py` a `src/youtube_study/tool_catalog.json`, cargado y validado por `tool_catalog.py`.
+4. Se excluyeron conservadoramente `QR` y `SIM` de candidatos desconocidos y conceptos; también se corrigió la normalización previa al filtrado de stopwords.
+5. Los JSON y Markdown de herramientas incluyen categoría y procedencia; las tags de Anki incluyen ambas.
+
+Verificación ejecutada:
+
+```bash
+python3 -m py_compile app.py src/youtube_study/*.py
+.venv/bin/python -m pytest tests/test_analyzer.py -q
+.venv/bin/python -m pytest -q
+```
+
+Resultado: `3 passed` en las pruebas heurísticas y `32 passed` en la suite completa.
+
+Criterio de aceptación cumplido: las herramientas conocidas se detectan con categoría, `QR` y `SIM` no aparecen como candidatas ni conceptos, y las pruebas limitan la regresión.
+
+[DONE:5]
+
+⏸️ PAUSE — Revisar resultados heurísticos en fragmentos limitados de videos locales antes de continuar con documentación, dependencias y calidad de desarrollo.
+
 ## Fase 6 — Calidad heurística medible (prioridad media) [DONE:5]
 
 1. Se añadieron fixtures breves y etiquetados en `tests/fixtures/heuristics.txt` y pruebas en `tests/test_analyzer.py` para herramientas conocidas, categorías, falsos positivos y conceptos.
@@ -180,6 +202,27 @@ Criterio de aceptación cumplido: las herramientas conocidas se detectan con cat
 ⏸️ PAUSE — Revisar resultados heurísticos en fragmentos limitados de videos locales antes de continuar con documentación, dependencias y calidad de desarrollo.
 
 ## Fase 7 — Documentación, dependencias y calidad de desarrollo (prioridad media-baja)
+
+1. Se actualizó `README.md` con los artefactos reales, `rebuild-library`, comportamiento de errores y el estado del roadmap.
+2. `requirements.txt` quedó limitado a runtime (`yt-dlp`) y se creó `requirements-dev.txt` para runtime, `pytest` y Ruff.
+3. Se añadió `pyproject.toml` con Ruff (`E`, `F`, `I`, Python 3.11 y línea de 120 caracteres); se aplicaron formato y ordenación de imports sin cambios funcionales.
+4. El README documenta Python 3.11+ y el flujo reproducible de instalación, lint, compilación y pruebas.
+5. Se verificó que `.pi/skills/video-study-summary/SKILL.md` ya está versionado como recurso compartido.
+
+Verificación ejecutada:
+
+```bash
+.venv/bin/python -m ruff format --check .
+.venv/bin/python -m ruff check .
+python3 -m py_compile app.py src/youtube_study/*.py
+.venv/bin/python -m pytest -q
+```
+
+Resultado: formato y lint correctos; `32 passed`.
+
+[DONE:5]
+
+⏸️ PAUSE — Revisar documentación como una persona que clona el repositorio por primera vez. Los archivos no rastreados preexistentes `PHASES_5_7.md` y `research_about_videos/` requieren una decisión independiente antes de exigir un árbol de trabajo totalmente limpio.
 
 ## Fase 7 — Documentación, dependencias y calidad de desarrollo (prioridad media-baja)
 

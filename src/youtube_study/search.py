@@ -45,8 +45,8 @@ def search_transcript(
         if query_lower not in line.lower():
             continue
         timestamp, text = parse_transcript_line(line)
-        before = lines[max(0, index - context):index] if context > 0 else []
-        after = lines[index + 1:index + 1 + context] if context > 0 else []
+        before = lines[max(0, index - context) : index] if context > 0 else []
+        after = lines[index + 1 : index + 1 + context] if context > 0 else []
         results.append(
             SearchResult(
                 video_id=video_id,

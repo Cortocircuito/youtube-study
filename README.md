@@ -1,20 +1,18 @@
 # YouTube Study
 
-Aplicación para estudiar videos de YouTube a partir de sus transcripciones.
+Aplicación local para estudiar videos de YouTube a partir de sus subtítulos, sin requerir Ollama ni otros servicios de IA.
 
 ## Qué hace
 
-- Descarga subtítulos con `yt-dlp`.
-- Limpia la transcripción.
-- Extrae herramientas mencionadas.
-- Genera resumen por timestamps y por bloques.
-- Crea preguntas de repaso.
-- Crea flashcards.
-- Genera una guía de estudio.
+- Descarga subtítulos con `yt-dlp` y elige de forma preferente español manual, español automático original, traducción solicitada, inglés y un fallback controlado.
+- Limpia subtítulos VTT, elimina solapamientos de captions automáticos y normaliza aliases frecuentes.
+- Genera resúmenes, conceptos, preguntas, flashcards, guía de estudio, un Markdown consolidado y CSV para Anki.
+- Mantiene una biblioteca local y permite listar, consultar, buscar, reanalizar y exportar videos.
+- Clasifica hallazgos como herramienta, protocolo, modelo, servicio o candidato heurístico.
 
-## Instalación recomendada en Ubuntu 24.04
+## Requisitos e instalación
 
-No uses el `yt-dlp` de `apt` para este proyecto: suele estar desactualizado.
+Se requiere **Python 3.11 o superior**. No uses el `yt-dlp` de `apt`: puede estar desactualizado.
 
 ```bash
 python3 -m venv .venv
@@ -22,121 +20,94 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Uso rápido
+Para ejecutar tests, lint y formato de desarrollo:
 
-Analizar un video nuevo:
+```bash
+pip install -r requirements-dev.txt
+python -m ruff check .
+python -m pytest
+```
+
+## Uso
+
+Estudiar un video nuevo:
 
 ```bash
 python app.py "https://www.youtube.com/watch?v=Yj51wXMwFwE"
+python app.py study "URL" --lang "es-419,es" --out data/videos
 ```
 
-O explícitamente:
-
-```bash
-python app.py study "https://www.youtube.com/watch?v=Yj51wXMwFwE" --lang "es-419,es" --out data/videos
-```
-
-Opciones útiles al descargar:
+Opciones de descarga:
 
 ```bash
 python app.py study "URL" --quiet
 python app.py study "URL" --force-download
 ```
 
-La app prioriza subtítulos españoles y muestra un error claro si no encuentra ninguno. Si `yt-dlp` está desactualizado, activa el venv y reinstala con `pip install -r requirements.txt`.
-
-Listar videos guardados en la biblioteca local:
+Biblioteca local:
 
 ```bash
 python app.py list
-```
-
-Ver detalle de un video estudiado:
-
-```bash
 python app.py show VIDEO_ID
+python app.py rebuild-library
 ```
 
-Buscar texto dentro de transcripciones:
+Búsqueda, reanálisis y exportación:
 
 ```bash
 python app.py search "consulta"
 python app.py search "consulta" --video VIDEO_ID --limit 5 --context 1
-```
-
-Reanalizar un video ya descargado sin volver a descargar subtítulos:
-
-```bash
 python app.py analyze VIDEO_ID
+python app.py export VIDEO_ID --format markdown|anki|all
 ```
 
-Exportar un documento consolidado o tarjetas para Anki:
+Los errores previstos —video inexistente, metadata local inválida, subtítulos no disponibles o argumentos no válidos— se imprimen sin traceback y el comando termina con código distinto de cero.
 
-```bash
-python app.py export VIDEO_ID --format markdown
-python app.py export VIDEO_ID --format anki
-python app.py export VIDEO_ID --format all
-```
+## Datos y archivos generados
 
-## Biblioteca local
-
-La app mantiene una biblioteca en:
+La biblioteca se guarda en `data/library.json`. Cada video se almacena en `data/videos/VIDEO_ID/`:
 
 ```txt
-data/library.json
+VIDEO_ID.<idioma>.vtt
+info.json
+transcript.txt
+transcript.clean.txt
+transcript.paragraphs.md
+summary.md
+tools.md
+tools.json
+concepts.md
+concepts.json
+questions.md
+flashcards.md
+study-guide.md
+study.md
+anki.csv
 ```
 
-Ahí guarda metadata de cada video: id, título, canal, duración, URL, ruta local, herramientas detectadas y fechas.
-
-## Archivos generados
-
-Para cada video se crea una carpeta:
-
-```txt
-data/videos/VIDEO_ID/
-├── VIDEO_ID.es-419.vtt
-├── VIDEO_ID.es.vtt
-├── info.json
-├── transcript.txt
-├── transcript.clean.txt
-├── transcript.paragraphs.md
-├── summary.md
-├── tools.md
-├── concepts.md
-├── questions.md
-├── flashcards.md
-├── study-guide.md
-├── study.md
-└── anki.csv
-```
+`tools.json` y `tools.md` incluyen la categoría y procedencia de cada hallazgo. `anki.csv` incorpora tags de video, canal, categoría y procedencia.
 
 ## Flujo de estudio recomendado
 
 1. Lee `summary.md`.
-2. Revisa `tools.md`.
-3. Estudia `concepts.md` por bloques de tiempo.
-4. Contesta `questions.md` sin mirar.
-5. Repasa con `flashcards.md`.
+2. Revisa `tools.md` y `concepts.md`.
+3. Responde `questions.md` sin mirar la transcripción.
+4. Repasa `flashcards.md` o importa `anki.csv` en Anki.
+5. Usa `study.md` si prefieres un único documento.
 
-## Tests
+## Desarrollo
 
-Después de instalar las dependencias en el venv:
+Validación completa:
 
 ```bash
+python -m ruff format --check .
+python -m ruff check .
+python -m py_compile app.py src/youtube_study/*.py
 python -m pytest
 ```
 
-También puedes ejecutar los tests estándar sin pytest:
+El skill compartido para resumir videos está versionado en `.pi/skills/video-study-summary/`.
 
-```bash
-python3 -m unittest discover -s tests -v
-```
+## Próximo paso
 
-## Próximos pasos
-
-- Mejorar detección heurística de herramientas y conceptos.
-- Exportar `tools.json` y `concepts.json`.
-- Crear `study.md` consolidado.
-- Exportar flashcards a Anki CSV.
-- Añadir tests mínimos.
-- Dejar Ollama para una fase futura opcional.
+La siguiente mejora prevista es automatizar estas validaciones en GitHub Actions. Ollama, Whisper, GUI, PDF y búsqueda semántica permanecen fuera del alcance actual.

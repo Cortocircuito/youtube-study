@@ -16,7 +16,9 @@ def load_tool_catalog(path: Path = CATALOG_PATH) -> tuple[dict[str, dict[str, An
 
     catalog: dict[str, dict[str, Any]] = {}
     for tool in tools:
-        if not isinstance(tool, dict) or not all(isinstance(tool.get(field), str) for field in ("name", "description", "category")):
+        if not isinstance(tool, dict) or not all(
+            isinstance(tool.get(field), str) for field in ("name", "description", "category")
+        ):
             raise ValueError("Cada herramienta del catálogo necesita name, description y category.")
         catalog[tool["name"].lower()] = tool
 

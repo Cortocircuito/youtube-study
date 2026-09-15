@@ -1,8 +1,8 @@
 import json
 import tempfile
-from pathlib import Path
 import unittest
 import warnings
+from pathlib import Path
 
 from src.youtube_study.analyzer import ToolMention
 from src.youtube_study.library import get_video, load_library, rebuild_library, resolve_video_path, upsert_video
@@ -14,7 +14,13 @@ class LibraryTests(unittest.TestCase):
             root = Path(temp)
             library_path = root / "library.json"
             video_dir = root / "video-1"
-            info = {"id": "video-1", "title": "Primero", "uploader": "Canal", "duration": 60, "webpage_url": "https://example.test"}
+            info = {
+                "id": "video-1",
+                "title": "Primero",
+                "uploader": "Canal",
+                "duration": 60,
+                "webpage_url": "https://example.test",
+            }
             tools = [ToolMention("ssh", 2, "Acceso remoto")]
 
             first = upsert_video(library_path, info, video_dir, tools)
