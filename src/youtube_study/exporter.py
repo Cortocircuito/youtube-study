@@ -67,7 +67,8 @@ def write_tools(path: Path, tools: list[ToolMention]) -> None:
         lines += [
             f"## {tool.name}",
             "",
-            f"- Tipo: {'conocida' if tool.kind == 'known' else 'posible/desconocida'}",
+            f"- Categoría: {tool.category}",
+            f"- Procedencia: {'conocida' if tool.kind == 'known' else 'posible/desconocida'}",
             f"- Menciones: {tool.count}",
             f"- Descripción: {tool.description}",
             "",
@@ -77,7 +78,7 @@ def write_tools(path: Path, tools: list[ToolMention]) -> None:
 
 def write_tools_json(path: Path, tools: list[ToolMention]) -> None:
     payload = [
-        {"name": tool.name, "count": tool.count, "description": tool.description, "kind": tool.kind}
+        {"name": tool.name, "count": tool.count, "description": tool.description, "category": tool.category, "kind": tool.kind}
         for tool in tools
     ]
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -146,7 +147,8 @@ def write_study_markdown_from_result(path: Path, title: str, result: AnalysisRes
             lines += [
                 f"### {tool.name}",
                 "",
-                f"- Tipo: {'conocida' if tool.kind == 'known' else 'posible/desconocida'}",
+                f"- Categoría: {tool.category}",
+                f"- Procedencia: {'conocida' if tool.kind == 'known' else 'posible/desconocida'}",
                 f"- Menciones: {tool.count}",
                 f"- Descripción: {tool.description}",
                 "",

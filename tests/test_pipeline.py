@@ -61,7 +61,9 @@ def test_generate_study_files_writes_all_artifacts_from_one_analysis(tmp_path: P
     study = (video_dir / "study.md").read_text(encoding="utf-8")
     anki = (video_dir / "anki.csv").read_text(encoding="utf-8-sig")
 
-    assert any(tool["name"] == "tailscale" for tool in tools)
+    tailscale = next(tool for tool in tools if tool["name"] == "tailscale")
+    assert tailscale["category"] == "service"
+    assert tailscale["kind"] == "known"
     assert concepts and {"name", "score", "count", "timestamps"}.issubset(concepts[0])
     assert info["analysis"]["format_version"] == 1
     assert "# Estudio consolidado: Demo Ñ" in study

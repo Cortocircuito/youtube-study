@@ -2,7 +2,7 @@
 title: "Endurecer y refactorizar YouTube Study"
 status: in_progress
 created: "2026-09-04T15:46:11.517Z"
-updated: "2026-09-12T01:08:11.783Z"
+updated: "2026-09-15T02:42:54.518Z"
 type: refactor
 ---
 
@@ -157,21 +157,27 @@ Criterio de aceptación: `app.py` solo inicia CLI; no cambia contrato público.
 
 ## Fase 6 — Calidad heurística medible (prioridad media)
 
-1. Crear fixtures pequeños etiquetados con herramientas/conceptos esperados y falsos positivos conocidos (`QR`, `SIM`, nombres comunes).
-2. Separar “herramienta”, “protocolo”, “modelo”, “servicio” y “candidato desconocido” en categoría explícita.
-3. Mover aliases y catálogo de herramientas a datos configurables versionados, conservando defaults.
-4. Mejorar stopwords y ranking de conceptos con criterios medibles; excluir verbos/muletillas frecuentes.
-5. Añadir métricas simples sobre fixtures (precisión de herramientas conocidas y lista máxima de falsos positivos) para impedir regresiones.
+## Fase 6 — Calidad heurística medible (prioridad media) [DONE:5]
 
-Verificación:
+1. Se añadieron fixtures breves y etiquetados en `tests/fixtures/heuristics.txt` y pruebas en `tests/test_analyzer.py` para herramientas conocidas, categorías, falsos positivos y conceptos.
+2. `ToolMention` ahora distingue categoría (`tool`, `protocol`, `model`, `service` o `candidate`) y procedencia (`known`/`unknown`).
+3. El catálogo y aliases de detección salieron de `analyzer.py` a `src/youtube_study/tool_catalog.json`, cargado y validado por `tool_catalog.py`.
+4. Se excluyeron conservadoramente `QR` y `SIM` de candidatos desconocidos y conceptos; también se corrigió la normalización previa al filtrado de stopwords.
+5. Los JSON y Markdown de herramientas incluyen categoría y procedencia; las tags de Anki incluyen ambas.
+
+Verificación ejecutada:
 
 ```bash
-.venv/bin/python -m pytest tests/test_analyzer.py
+python3 -m py_compile app.py src/youtube_study/*.py
+.venv/bin/python -m pytest tests/test_analyzer.py -q
+.venv/bin/python -m pytest -q
 ```
 
-Criterio de aceptación: fixtures no clasifican `QR`/`SIM` como herramientas y conceptos principales evitan muletillas conocidas.
+Resultado: `3 passed` en las pruebas heurísticas y `32 passed` en la suite completa.
 
-⏸️ PAUSE — Revisar resultados heurísticos en fragmentos limitados de ambos videos locales.
+Criterio de aceptación cumplido: las herramientas conocidas se detectan con categoría, `QR` y `SIM` no aparecen como candidatas ni conceptos, y las pruebas limitan la regresión.
+
+⏸️ PAUSE — Revisar resultados heurísticos en fragmentos limitados de videos locales antes de continuar con documentación, dependencias y calidad de desarrollo.
 
 ## Fase 7 — Documentación, dependencias y calidad de desarrollo (prioridad media-baja)
 

@@ -1,0 +1,89 @@
+{
+  "tools": [
+    {
+      "name": "tailscale",
+      "description": "Red privada/VPN mesh para conectar dispositivos sin abrir puertos públicos.",
+      "category": "service",
+      "aliases": []
+    },
+    {
+      "name": "openssh",
+      "description": "Servidor/cliente SSH para entrar remotamente en una máquina.",
+      "category": "tool",
+      "aliases": []
+    },
+    {
+      "name": "ssh",
+      "description": "Protocolo de acceso remoto seguro usado para entrar al equipo.",
+      "category": "protocol",
+      "aliases": []
+    },
+    {
+      "name": "moshi",
+      "description": "App móvil para gestionar conexiones SSH/Mosh y agentes desde el teléfono.",
+      "category": "tool",
+      "aliases": ["moshie", "mochi"]
+    },
+    {
+      "name": "herdr",
+      "description": "Multiplexor de terminales orientado a agentes; mantiene sesiones vivas.",
+      "category": "tool",
+      "aliases": ["herder", "gerd"]
+    },
+    {
+      "name": "tmux",
+      "description": "Multiplexor clásico para mantener sesiones de terminal persistentes.",
+      "category": "tool",
+      "aliases": []
+    },
+    {
+      "name": "whisper",
+      "description": "Sistema de transcripción/dictado de voz.",
+      "category": "model",
+      "aliases": []
+    },
+    {
+      "name": "claude",
+      "description": "Modelo/agente de IA usado para tareas de código.",
+      "category": "model",
+      "aliases": ["claudio", "clou"]
+    },
+    {
+      "name": "codex",
+      "description": "Agente/modelo de IA de OpenAI para tareas de código.",
+      "category": "model",
+      "aliases": []
+    },
+    {
+      "name": "ollama",
+      "description": "Herramienta para ejecutar modelos de IA localmente.",
+      "category": "tool",
+      "aliases": []
+    },
+    {
+      "name": "llama.cpp",
+      "description": "Motor ligero para ejecutar modelos LLM localmente.",
+      "category": "tool",
+      "aliases": []
+    },
+    {
+      "name": "storybook",
+      "description": "Herramienta para desarrollar y probar componentes UI aislados.",
+      "category": "tool",
+      "aliases": []
+    },
+    {
+      "name": "ufw",
+      "description": "Firewall simple de Ubuntu/Linux.",
+      "category": "tool",
+      "aliases": []
+    },
+    {
+      "name": "systemd",
+      "description": "Sistema de servicios de Linux; permite dejar procesos activos.",
+      "category": "service",
+      "aliases": []
+    }
+  ],
+  "unknown_candidate_exclusions": ["qr", "sim"]
+}

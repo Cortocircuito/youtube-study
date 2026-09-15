@@ -1,0 +1,4 @@
+Entonces QR QR y SIM SIM no son herramientas. Ahora la gente puede ver cosas.
+SSH permite acceso remoto seguro y Tailscale conecta equipos privados. SSH funciona junto a Tailscale.
+tmux mantiene sesiones persistentes y Claude ayuda a revisar código. tmux y Claude se mencionan otra vez.
+CodePilot integra asistentes y CodePilot aparece de nuevo.

@@ -4,37 +4,21 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 
+from .tool_catalog import TOOL_CATALOG, UNKNOWN_CANDIDATE_EXCLUSIONS
 from .transcript import Cue, chunk_by_minutes
 
 ANALYSIS_FORMAT_VERSION = 1
 
 STOPWORDS = set("""
-a acá ahí al algo algunas algunos ante antes aquí así aunque cada casi como con contra cual cuando de del desde donde dos e el ella ellas ellos en entre era eran es esa esas ese eso esos esta estaba están estar estas esté este esto estos fue han hasta hay la las le les lo los más me mi mis muy no nos o para pero por porque que se ser si sin sobre son su sus te tenía tienen tenemos todo todos tu un una unas unos y ya yo bien entonces ejemplo ahora ver voy vos qué cómo cosa cosas hacer ahí acá directamente caso gente tener tiene tengo está estoy estás estamos están vas vamos puedo podés podes puede pueden podría verdad realmente mostrar miren vean después acá abajo arriba también bien
+a acá ahí al algo algunas algunos ante antes aquí así aunque cada casi como con contra cual cuando de del desde donde dos e el ella ellas ellos en entre era eran es esa esas ese eso esos esta estaba están estar estas esté este esto estos fue han hasta hay la las le les lo los más me mi mis muy no nos o para pero por porque que se ser si sin sobre son su sus te tenía tienen tenemos todo todos tu un una unas unos y ya yo bien entonces ejemplo ahora ver voy vos qué cómo cosa cosas hacer ahí acá directamente caso gente tener tiene tengo está estoy estás estamos están vas vamos puedo podés podes puede pueden podría verdad realmente mostrar miren vean después acá abajo arriba también qr sim
 """.split())
-
-KNOWN_TOOLS = {
-    "tailscale": "Red privada/VPN mesh para conectar dispositivos sin abrir puertos públicos.",
-    "openssh": "Servidor/cliente SSH para entrar remotamente en una máquina.",
-    "ssh": "Protocolo de acceso remoto seguro usado para entrar al equipo.",
-    "moshi": "App móvil para gestionar conexiones SSH/Mosh y agentes desde el teléfono.",
-    "herdr": "Multiplexor de terminales orientado a agentes; mantiene sesiones vivas.",
-    "tmux": "Multiplexor clásico para mantener sesiones de terminal persistentes.",
-    "whisper": "Sistema de transcripción/dictado de voz.",
-    "claude": "Modelo/agente de IA usado para tareas de código.",
-    "codex": "Agente/modelo de IA de OpenAI para tareas de código.",
-    "ollama": "Herramienta para ejecutar modelos de IA localmente.",
-    "llama.cpp": "Motor ligero para ejecutar modelos LLM localmente.",
-    "storybook": "Herramienta para desarrollar y probar componentes UI aislados.",
-    "ufw": "Firewall simple de Ubuntu/Linux.",
-    "systemd": "Sistema de servicios de Linux; permite dejar procesos activos.",
-    "beelink": "Mini PC mencionada como máquina encendida 24/7.",
-}
 
 @dataclass
 class ToolMention:
     name: str
     count: int
     description: str
+    category: str = "tool"
     kind: str = "known"
 
 
@@ -64,44 +48,54 @@ def full_text(cues: list[Cue]) -> str:
 
 
 def keywords(text: str, limit: int = 25) -> list[tuple[str, int]]:
-    words = re.findall(r"[a-záéíóúñü0-9][a-záéíóúñü0-9_.-]{2,}", text.lower())
-    words = [w.strip(".-_") for w in words if w not in STOPWORDS and not w.isdigit()]
+    words = [word.strip(".-_") for word in re.findall(r"[a-záéíóúñü0-9][a-záéíóúñü0-9_.-]{2,}", text.lower())]
+    words = [word for word in words if word and word not in STOPWORDS and not word.isdigit()]
     return Counter(words).most_common(limit)
 
 
 def detect_tools(text: str) -> list[ToolMention]:
     lower = text.lower()
-    aliases = {
-        "moshi": ["moshi", "moshie", "mochi"],
-        "herdr": ["herdr", "herder", "gerd"],
-        "claude": ["claude", "claudio", "clou"],
-    }
     mentions: list[ToolMention] = []
-    for name, desc in KNOWN_TOOLS.items():
-        names = aliases.get(name, [name])
-        count = 0
-        for alias in names:
-            pattern = r"(?<![\w.-])" + re.escape(alias.lower()) + r"(?![\w.-])"
-            count += len(re.findall(pattern, lower))
+    for name, tool in TOOL_CATALOG.items():
+        aliases = [name, *tool.get("aliases", [])]
+        count = sum(
+            len(re.findall(r"(?<![\w.-])" + re.escape(alias.lower()) + r"(?![\w.-])", lower))
+            for alias in aliases
+        )
         if count:
-            mentions.append(ToolMention(name, count, desc, "known"))
-    mentions.extend(detect_unknown_tools(text, {tool.name for tool in mentions}))
-    return sorted(mentions, key=lambda x: (x.kind != "known", -x.count, x.name))
+            mentions.append(
+                ToolMention(
+                    name=name,
+                    count=count,
+                    description=tool["description"],
+                    category=tool["category"],
+                )
+            )
+    mentions.extend(detect_unknown_tools(text, set(TOOL_CATALOG)))
+    return sorted(mentions, key=lambda item: (item.kind != "known", -item.count, item.name))
 
 
 def detect_unknown_tools(text: str, known_names: set[str], limit: int = 8) -> list[ToolMention]:
-    """Detect possible tool/product names not present in KNOWN_TOOLS."""
+    """Detect conservative candidates not present in the versioned tool catalog."""
     candidates = re.findall(r"\b[a-zA-Z][a-zA-Z0-9]*(?:[.-][a-zA-Z0-9]+)+\b", text)
     candidates += re.findall(r"\b[A-Z]{2,8}\b", text)
     candidates += re.findall(r"\b[A-Z][a-z]+(?:[A-Z][a-z0-9]+)+\b", text)
     counts = Counter(candidates)
-    results: list[ToolMention] = []
     ignored = {"Entonces", "Ahora", "Bien", "Mirá", "Vean", "Vos", "Para", "Esto", "Como"}
+    results: list[ToolMention] = []
     for name, count in counts.most_common():
         normalized = name.lower().strip(".-")
-        if normalized in known_names or normalized in STOPWORDS or name in ignored or count < 2:
+        if normalized in known_names or normalized in STOPWORDS or normalized in UNKNOWN_CANDIDATE_EXCLUSIONS or name in ignored or count < 2:
             continue
-        results.append(ToolMention(name, count, "Posible herramienta o nombre propio detectado heurísticamente.", "unknown"))
+        results.append(
+            ToolMention(
+                name=name,
+                count=count,
+                description="Posible herramienta o nombre propio detectado heurísticamente.",
+                category="candidate",
+                kind="unknown",
+            )
+        )
         if len(results) >= limit:
             break
     return results
@@ -193,7 +187,7 @@ def flatten_questions(qs: dict[str, list[str]]) -> list[str]:
 
 def flashcards(tools: list[ToolMention], qs: dict[str, list[str]]) -> list[dict[str, str]]:
     cards = [
-        {"question": f"¿Qué es {tool.name}?", "answer": tool.description, "tags": f"tool {tool.kind} {tool.name}"}
+        {"question": f"¿Qué es {tool.name}?", "answer": tool.description, "tags": f"tool {tool.category} {tool.kind} {tool.name}"}
         for tool in tools[:10]
     ]
     for q in flatten_questions(qs)[:5]:
