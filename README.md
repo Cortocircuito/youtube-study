@@ -108,6 +108,8 @@ python -m pytest
 
 El skill compartido para resumir videos está versionado en `.pi/skills/video-study-summary/`.
 
-## Próximo paso
+## Integración continua
 
-La siguiente mejora prevista es automatizar estas validaciones en GitHub Actions. Ollama, Whisper, GUI, PDF y búsqueda semántica permanecen fuera del alcance actual.
+GitHub Actions valida cada push y pull request con Python 3.11 mediante instalación limpia, `python app.py --help`, Ruff, compilación y tests. No descarga videos ni usa red durante las pruebas.
+
+Ollama, Whisper, GUI, PDF y búsqueda semántica permanecen fuera del alcance actual.
