@@ -2,7 +2,7 @@
 title: "Mejorar calidad y referencias del material de estudio"
 status: draft
 created: "2026-09-18T22:35:24.068Z"
-updated: "2026-09-18T23:09:54.334Z"
+updated: "2026-09-18T23:21:17.008Z"
 type: feature
 ---
 
@@ -107,29 +107,29 @@ Criterio de aceptación cumplido: enlaces correctos con URL, fallback temporal s
 
 ## Fase 5 — Integración, migración y cierre
 
-**Estado: [DONE:4] — cierre remoto pendiente**
+**Estado: [DONE:5]**
 
 1. [DONE:1] `generate_study_files()` y `export_study()` generan Markdown y Anki desde el mismo `AnalysisResult` v2 y comparten contexto de fuente.
-2. [DONE:2] Se añadió una prueba que migra artefactos v1 con `analyze_existing()` usando subtítulos locales: actualiza metadata a v2, elimina placeholders y conserva enlaces, sin red.
+2. [DONE:2] Una prueba migra artefactos v1 mediante `analyze_existing()` con subtítulos locales: actualiza metadata a v2, elimina placeholders y conserva enlaces, sin red.
 3. [DONE:3] `README.md`, `AGENTS.md` y `PLAN.md` reflejan análisis v2, referencias temporales, regeneración local y prioridades actuales.
 4. [DONE:4] Pasaron smoke tests de `--help`, `list`, `rebuild-library`, atajo URL simulado y migración v1→v2, además de la validación completa equivalente a CI.
-5. [PENDING] El diff está revisado y el contrato `python app.py "URL"` está cubierto; falta commit, push y confirmar CI verde antes de cerrar el plan.
+5. [DONE:5] Diff y contrato `python app.py "URL"` revisados; commit `67e9329` enviado y workflow CI `35405313710` completado correctamente.
 
-Verificación ejecutada:
+Verificación final:
 
 ```bash
-.venv/bin/python app.py --help
-.venv/bin/python -m ruff format --check .
-.venv/bin/python -m ruff check .
-.venv/bin/python -m py_compile app.py src/youtube_study/*.py
-.venv/bin/python -m pytest -q
+python app.py --help
+python -m ruff format --check .
+python -m ruff check .
+python -m py_compile app.py src/youtube_study/*.py
+python -m pytest
 ```
 
-Resultado local: `41 passed`; Ruff, formato, compilación y `git diff --check` correctos.
+Resultado: `41 passed` localmente; GitHub Actions verde con Python 3.11.
 
-Criterio local cumplido: migración v2, documentación, CLI y suite están validados sin red. El criterio final requiere CI remoto verde.
+Criterio de aceptación cumplido: suite verde, contrato CLI intacto y análisis v2 verificable sin placeholders.
 
-⏸️ PAUSA FINAL — Autorizar commit/push y confirmar CI antes de marcar `[DONE:5]` y cerrar.
+⏸️ PAUSA FINAL SUPERADA — Plan completado.
 
 ## Riesgos y mitigaciones
 
