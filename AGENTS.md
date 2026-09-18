@@ -22,12 +22,13 @@ Permitir descargar subtítulos, limpiar la transcripción y generar material de 
 
 ## Comandos principales
 
-Crear entorno:
+Crear entorno de runtime y desarrollo:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
 Analizar video:
@@ -52,22 +53,30 @@ python app.py analyze VIDEO_ID
 python app.py export VIDEO_ID --format markdown|anki|all
 ```
 
-Validar sintaxis y tests:
+Validación local equivalente a CI:
 
 ```bash
-python3 -m py_compile app.py src/youtube_study/*.py
+python app.py --help
+python -m ruff check .
+python -m py_compile app.py src/youtube_study/*.py
 python -m pytest
 ```
 
 ## Estructura
 
 ```txt
-app.py                         # CLI principal
-src/youtube_study/downloader.py # descarga subtítulos con yt-dlp
-src/youtube_study/transcript.py # limpieza y transformación de VTT
-src/youtube_study/analyzer.py   # análisis heurístico
-src/youtube_study/exporter.py   # generación de archivos Markdown/JSON
-PLAN.md                         # roadmap del proyecto
+app.py                          # entry point mínimo
+src/youtube_study/cli.py         # argumentos, comandos y salida
+src/youtube_study/service.py     # pipeline study, analyze y export
+src/youtube_study/downloader.py  # descarga subtítulos con yt-dlp
+src/youtube_study/transcript.py  # limpieza y transformación de VTT
+src/youtube_study/analyzer.py    # análisis heurístico
+src/youtube_study/tool_catalog.* # catálogo versionado de herramientas
+src/youtube_study/library.py     # biblioteca local
+src/youtube_study/search.py      # búsqueda en transcripciones
+src/youtube_study/exporter.py    # artefactos Markdown, JSON y Anki
+.github/workflows/ci.yml         # validación automática en GitHub
+PLAN.md                          # roadmap futuro del proyecto
 ```
 
 ## Reglas de desarrollo
@@ -80,15 +89,16 @@ PLAN.md                         # roadmap del proyecto
 - Al ejecutar planes con `openplan`, avanzar por fases cortas y pausar después de máximo 5 pasos.
 - Preferir módulos pequeños dentro de `src/youtube_study/`.
 - Cada mejora debe mantener funcionando el comando `python app.py "URL"`.
-- Después de cambios en código Python, ejecutar `python3 -m py_compile app.py src/youtube_study/*.py`.
+- Después de cambios en código Python, ejecutar `python -m ruff check .`, `python -m py_compile app.py src/youtube_study/*.py` y `python -m pytest`.
+- La CI no debe descargar videos, leer datos reales de `data/`, ni usar Ollama, API keys o red; usar fixtures pequeños en `tests/`.
 
 ## Prioridades actuales
 
-1. Mejorar limpieza de subtítulos automáticos ruidosos.
-2. Crear biblioteca local `data/library.json`.
-3. Añadir comandos `list`, `show`, `search` y `analyze`.
-4. Mejorar detección de herramientas y conceptos.
-5. Añadir exportación Markdown consolidada y Anki CSV.
+1. Mejorar la limpieza de subtítulos automáticos ruidosos.
+2. Mejorar la precisión de herramientas, candidatos y conceptos mediante fixtures y tests de regresión.
+3. Ampliar cobertura de tests de los módulos críticos sin imponer umbral hasta medir la situación.
+4. Mantener README, dependencias, Ruff y CI alineados con el comportamiento real.
+5. Evaluar exportación PDF y búsqueda semántica solo después de estabilizar el flujo local.
 
 ## Futuro
 
