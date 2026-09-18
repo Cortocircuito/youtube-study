@@ -7,7 +7,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .analyzer import ANALYSIS_FORMAT_VERSION, AnalysisResult, ConceptMention, ToolMention, flatten_questions
+from .analyzer import (
+    ANALYSIS_FORMAT_VERSION,
+    AnalysisResult,
+    ConceptMention,
+    Flashcard,
+    StudyQuestion,
+    ToolMention,
+    flatten_questions,
+)
 from .transcript import Cue, as_text, chunk_by_minutes
 
 
@@ -126,20 +134,33 @@ def write_summary(
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def write_questions(path: Path, questions: dict[str, list[str]]) -> None:
+def write_questions(path: Path, questions: dict[str, list[StudyQuestion]]) -> None:
     headings = {"basicas": "Básicas", "comprension": "Comprensión", "practicas": "Prácticas"}
     lines = ["# Preguntas de repaso", ""]
     for level, items in questions.items():
         lines += [f"## {headings.get(level, level.title())}", ""]
-        lines += [f"{i}. {q}" for i, q in enumerate(items, 1)] or ["Sin preguntas generadas."]
+        for index, item in enumerate(items, 1):
+            lines += [
+                f"{index}. {item.question}",
+                f"   - Respuesta: {item.answer}",
+                f"   - Referencia: [{item.timestamp}]",
+            ]
+        if not items:
+            lines.append("Sin preguntas generadas.")
         lines.append("")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def write_flashcards(path: Path, cards: list[dict[str, str]]) -> None:
+def write_flashcards(path: Path, cards: list[Flashcard]) -> None:
     lines = ["# Flashcards", ""]
     for card in cards:
-        lines += [f"Q: {card['question']}", f"A: {card['answer']}", f"Tags: {card.get('tags', '')}", ""]
+        lines += [
+            f"Q: {card.question}",
+            f"A: {card.answer}",
+            f"Referencia: [{card.timestamp}]",
+            f"Tags: {card.tags}",
+            "",
+        ]
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
@@ -178,17 +199,38 @@ def write_study_markdown_from_result(path: Path, title: str, result: AnalysisRes
     headings = {"basicas": "Básicas", "comprension": "Comprensión", "practicas": "Prácticas"}
     for level, items in result.questions.items():
         lines += [f"### {headings.get(level, level.title())}", ""]
-        lines += [f"{index}. {question}" for index, question in enumerate(items, 1)] or ["Sin preguntas generadas."]
+        for index, item in enumerate(items, 1):
+            lines += [
+                f"{index}. {item.question}",
+                f"   - Respuesta: {item.answer}",
+                f"   - Referencia: [{item.timestamp}]",
+            ]
+        if not items:
+            lines.append("Sin preguntas generadas.")
         lines.append("")
 
     lines += ["## Flashcards", ""]
     for card in result.cards:
-        lines += [f"Q: {card['question']}", f"A: {card['answer']}", f"Tags: {card.get('tags', '')}", ""]
+        lines += [
+            f"Q: {card.question}",
+            f"A: {card.answer}",
+            f"Referencia: [{card.timestamp}]",
+            f"Tags: {card.tags}",
+            "",
+        ]
 
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def write_anki_csv(path: Path, cards: list[dict[str, str]], video_id: str, channel: str | None = None) -> None:
+def _card_field(card: Flashcard | dict[str, str], name: str) -> str:
+    if isinstance(card, dict):
+        return card.get(name, "")
+    return getattr(card, name)
+
+
+def write_anki_csv(
+    path: Path, cards: list[Flashcard] | list[dict[str, str]], video_id: str, channel: str | None = None
+) -> None:
     """Write UTF-8 CSV ready for Anki import: Front, Back, Tags."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8-sig", newline="") as file:
@@ -201,14 +243,16 @@ def write_anki_csv(path: Path, cards: list[dict[str, str]], video_id: str, chann
                 for part in [
                     f"video::{video_id}",
                     f"channel::{channel_tag}" if channel_tag else "",
-                    card.get("tags", ""),
+                    _card_field(card, "tags"),
                 ]
                 if part
             )
-            writer.writerow([card["question"], card["answer"], tags])
+            writer.writerow([_card_field(card, "question"), _card_field(card, "answer"), tags])
 
 
-def write_study_guide(path: Path, title: str, tools: list[ToolMention], questions: dict[str, list[str]]) -> None:
+def write_study_guide(
+    path: Path, title: str, tools: list[ToolMention], questions: dict[str, list[StudyQuestion]]
+) -> None:
     lines = [f"# Guía de estudio: {title}", "", "## 1. Qué debes entender", ""]
     lines += [f"- {tool.name}: {tool.description}" for tool in tools[:8]]
     lines += [
@@ -224,5 +268,5 @@ def write_study_guide(path: Path, title: str, tools: list[ToolMention], question
         "## 3. Preguntas clave",
         "",
     ]
-    lines += [f"- {q}" for q in flatten_questions(questions)[:8]]
+    lines += [f"- {item.question} [{item.timestamp}]" for item in flatten_questions(questions)[:8]]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")

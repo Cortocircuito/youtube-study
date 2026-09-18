@@ -2,7 +2,7 @@
 title: "Mejorar calidad y referencias del material de estudio"
 status: draft
 created: "2026-09-18T22:35:24.068Z"
-updated: "2026-09-18T22:51:34.702Z"
+updated: "2026-09-18T22:55:51.411Z"
 type: feature
 ---
 
@@ -57,19 +57,26 @@ Resultado: `36 passed, 1 xfailed`; Ruff, formato y compilación correctos.
 
 ## Fase 3 — Preguntas, respuestas y referencias estructuradas
 
-1. Añadir `StudyQuestion` y `Flashcard` y elevar `ANALYSIS_FORMAT_VERSION` a 2.
-2. Generar preguntas desde herramientas, conceptos e ideas; asignar respuesta extractiva, timestamp y extracto fuente.
-3. Eliminar respuestas placeholder; cada tarjeta debe ser autosuficiente o descartarse.
-4. Deduplicar preguntas y balancear categorías básica, comprensión y práctica.
-5. Conservar tags de herramienta/categoría/procedencia y sumar tags de tipo sin romper Anki.
+**Estado: [DONE:5]**
 
-Verificación:
+1. [DONE:1] Se añadieron las dataclasses inmutables `StudyQuestion` y `Flashcard`; `ANALYSIS_FORMAT_VERSION` subió a 2.
+2. [DONE:2] Las preguntas se generan desde herramientas, conceptos e ideas, y cada una conserva respuesta extractiva, timestamp, extracto fuente y categoría.
+3. [DONE:3] Se eliminaron respuestas placeholder: todas las tarjetas proceden de preguntas respondibles con contenido real del transcript.
+4. [DONE:4] Las preguntas se deduplican por clave normalizada y se distribuyen entre básicas, comprensión y prácticas; estas últimas eligen recomendaciones concretas.
+5. [DONE:5] Las tarjetas mantienen tags de herramienta/categoría/procedencia cuando corresponde y añaden `type::<categoría>`; Anki conserva compatibilidad con dicts existentes.
+
+Verificación ejecutada:
 
 ```bash
-python -m pytest tests/test_analyzer.py tests/test_exporter.py tests/test_quality.py -q
+.venv/bin/python -m ruff format --check .
+.venv/bin/python -m ruff check .
+.venv/bin/python -m py_compile app.py src/youtube_study/*.py
+.venv/bin/python -m pytest -q
 ```
 
-Criterio de aceptación: 100% de tarjetas de fixtures tienen respuesta no-placeholder y timestamp válido; no hay preguntas duplicadas normalizadas.
+Resultado: `38 passed`; ya no quedan pruebas `xfail`. Se revisaron preguntas y referencias de ambos fixtures sin acceder a transcripciones reales.
+
+Criterio de aceptación cumplido: 100% de preguntas y tarjetas de fixtures tienen respuesta no-placeholder y timestamp válido, sin preguntas normalizadas duplicadas.
 
 ⏸️ PAUSA — Revisar utilidad pedagógica y trazabilidad de una muestra pequeña.
 

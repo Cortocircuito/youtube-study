@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from .tool_catalog import TOOL_CATALOG, UNKNOWN_CANDIDATE_EXCLUSIONS
 from .transcript import Cue, chunk_by_minutes
 
-ANALYSIS_FORMAT_VERSION = 1
+ANALYSIS_FORMAT_VERSION = 2
 
 STOPWORDS = set(
     """
@@ -46,6 +46,24 @@ class TextWindow:
     position: int
 
 
+@dataclass(frozen=True)
+class StudyQuestion:
+    question: str
+    answer: str
+    timestamp: str
+    source_excerpt: str
+    category: str
+
+
+@dataclass(frozen=True)
+class Flashcard:
+    question: str
+    answer: str
+    timestamp: str
+    source_excerpt: str
+    tags: str
+
+
 @dataclass
 class AnalysisResult:
     cues: list[Cue]
@@ -54,8 +72,8 @@ class AnalysisResult:
     ideas: list[tuple[str, str]]
     sections: list[tuple[str, str, list[str]]]
     concepts: list[ConceptMention]
-    questions: dict[str, list[str]]
-    cards: list[dict[str, str]]
+    questions: dict[str, list[StudyQuestion]]
+    cards: list[Flashcard]
     format_version: int = ANALYSIS_FORMAT_VERSION
 
 
@@ -237,46 +255,127 @@ def concept_mentions(cues: list[Cue], limit: int = 20) -> list[ConceptMention]:
     return sorted(concepts, key=lambda item: item.score, reverse=True)
 
 
-def questions(cues: list[Cue], tools: list[ToolMention], limit: int = 10) -> dict[str, list[str]]:
-    text = full_text(cues).lower()
-    basic = [f"¿Qué es {tool.name} y para qué se menciona?" for tool in tools[:4]]
-    comprehension = [f"¿Qué papel cumple {tool.name} en el flujo explicado?" for tool in tools[:6]]
-    practice: list[str] = []
-    if "puerto 22" in text:
-        practice.append("¿Por qué no conviene abrir el puerto 22 directamente al router?")
-    if "authorized keys" in text or "llave" in text:
-        practice.append("¿Cuál es la diferencia entre llave pública y llave privada en SSH?")
-    if "qr" in text:
-        practice.append("¿Por qué el QR de emparejamiento debe mantenerse privado?")
-    if tools:
-        practice.append("¿Qué pasos repetirías en tu máquina después de ver el video?")
-    return {
-        "basicas": basic[:limit],
-        "comprension": comprehension[:limit],
-        "practicas": practice[:limit],
-    }
+def source_cue(cues: list[Cue], term: str) -> Cue | None:
+    pattern = re.compile(r"(?<![\w.-])" + re.escape(term) + r"(?![\w.-])", re.IGNORECASE)
+    return next((cue for cue in cues if pattern.search(cue.text)), None)
 
 
-def flatten_questions(qs: dict[str, list[str]]) -> list[str]:
+def question_key(question: str) -> str:
+    return " ".join(re.findall(r"[a-záéíóúñü0-9]+", question.lower()))
+
+
+QUESTION_TOPIC_EXCLUSIONS = {
+    "evita",
+    "evitar",
+    "mantener",
+    "revisa",
+    "revisar",
+    "probar",
+    "optimizar",
+    "conviene",
+    "presenta",
+    "reduce",
+    "aumenta",
+    "ayuda",
+    "permite",
+}
+
+
+def question_topic(text: str, excluded: set[str] | None = None) -> str:
+    ignored = QUESTION_TOPIC_EXCLUSIONS | (excluded or set())
+    return next((word for word, _ in keywords(text, 8) if word not in ignored), "este tema")
+
+
+def practical_excerpt(idea: str) -> str:
+    sentences = split_sentences(idea)
+    action_pattern = re.compile(
+        r"\b(?:debe|debería|conviene|primero|evita|revisa|compara|ajusta|deja|riega|hay que|no conviene)\b",
+        re.IGNORECASE,
+    )
+    return next(
+        (sentence for sentence in sentences if action_pattern.search(sentence)), sentences[0] if sentences else idea
+    )
+
+
+def questions(
+    cues: list[Cue],
+    tools: list[ToolMention],
+    concepts: list[ConceptMention],
+    ideas: list[tuple[str, str]],
+    limit: int = 10,
+) -> dict[str, list[StudyQuestion]]:
+    groups: dict[str, list[StudyQuestion]] = {"basicas": [], "comprension": [], "practicas": []}
+    seen: set[str] = set()
+
+    def add(category: str, question: str, answer: str, timestamp: str, excerpt: str) -> None:
+        key = question_key(question)
+        if not answer.strip() or not timestamp or key in seen or len(groups[category]) >= limit:
+            return
+        seen.add(key)
+        groups[category].append(StudyQuestion(question, answer.strip(), timestamp, excerpt.strip(), category))
+
+    used_topics: set[str] = set()
+    for tool in tools[:4]:
+        cue = source_cue(cues, tool.name)
+        if cue:
+            add("basicas", f"¿Qué se explica sobre {tool.name}?", cue.text, cue.start, cue.text)
+            used_topics.add(tool.name.lower())
+
+    for concept in concepts:
+        if len(groups["basicas"]) >= 4:
+            break
+        if concept.name in used_topics or concept.name in QUESTION_TOPIC_EXCLUSIONS:
+            continue
+        cue = source_cue(cues, concept.name)
+        if cue:
+            add("basicas", f"¿Qué se explica sobre {concept.name}?", cue.text, cue.start, cue.text)
+            used_topics.add(concept.name)
+
+    for timestamp, idea in ideas[:4]:
+        topic = question_topic(idea, used_topics)
+        add(
+            "comprension",
+            f"¿Cuál es la idea principal relacionada con {topic}?",
+            idea,
+            timestamp,
+            idea,
+        )
+        used_topics.add(topic)
+
+    for timestamp, idea in ideas[-3:]:
+        excerpt = practical_excerpt(idea)
+        topic = question_topic(excerpt)
+        add(
+            "practicas",
+            f"¿Qué recomendación o criterio práctico se presenta sobre {topic}?",
+            excerpt,
+            timestamp,
+            excerpt,
+        )
+
+    return groups
+
+
+def flatten_questions(qs: dict[str, list[StudyQuestion]]) -> list[StudyQuestion]:
     return [question for group in qs.values() for question in group]
 
 
-def flashcards(tools: list[ToolMention], qs: dict[str, list[str]]) -> list[dict[str, str]]:
-    cards = [
-        {
-            "question": f"¿Qué es {tool.name}?",
-            "answer": tool.description,
-            "tags": f"tool {tool.category} {tool.kind} {tool.name}",
-        }
-        for tool in tools[:10]
-    ]
-    for q in flatten_questions(qs)[:5]:
+def flashcards(tools: list[ToolMention], qs: dict[str, list[StudyQuestion]]) -> list[Flashcard]:
+    cards: list[Flashcard] = []
+    for item in flatten_questions(qs):
+        matching_tool = next((tool for tool in tools if tool.name.lower() in item.question.lower()), None)
+        if matching_tool:
+            tags = f"tool {matching_tool.category} {matching_tool.kind} {matching_tool.name} type::{item.category}"
+        else:
+            tags = f"question review type::{item.category}"
         cards.append(
-            {
-                "question": q,
-                "answer": "Respóndelo usando la sección correspondiente de la transcripción.",
-                "tags": "question review",
-            }
+            Flashcard(
+                question=item.question,
+                answer=item.answer,
+                timestamp=item.timestamp,
+                source_excerpt=item.source_excerpt,
+                tags=tags,
+            )
         )
     return cards
 
@@ -284,14 +383,16 @@ def flashcards(tools: list[ToolMention], qs: dict[str, list[str]]) -> list[dict[
 def analyze_cues(cues: list[Cue]) -> AnalysisResult:
     text = full_text(cues)
     tools = detect_tools(text)
-    qs = questions(cues, tools)
+    ideas = important_ideas(cues)
+    concepts = concept_mentions(cues)
+    qs = questions(cues, tools, concepts, ideas)
     return AnalysisResult(
         cues=cues,
         keywords=keywords(text),
         tools=tools,
-        ideas=important_ideas(cues),
+        ideas=ideas,
         sections=section_summaries(cues),
-        concepts=concept_mentions(cues),
+        concepts=concepts,
         questions=qs,
         cards=flashcards(tools, qs),
     )

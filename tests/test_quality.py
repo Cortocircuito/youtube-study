@@ -4,8 +4,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-import pytest
-
 from src.youtube_study.analyzer import STOPWORDS, analyze_cues, cue_windows
 from src.youtube_study.transcript import clean_vtt
 
@@ -107,7 +105,6 @@ def test_selected_ideas_do_not_repeat_near_identical_sentences() -> None:
     assert not similarities or max(similarities) < 0.72
 
 
-@pytest.mark.xfail(strict=True, reason="Preguntas y tarjetas referenciadas se implementarán en la fase 3")
 def test_questions_and_cards_have_source_answers_and_timestamps() -> None:
     results = [analyze_cues(clean_vtt(case["path"])) for case in CASES.values()]
     questions = [question for result in results for group in result.questions.values() for question in group]
@@ -117,3 +114,12 @@ def test_questions_and_cards_have_source_answers_and_timestamps() -> None:
     assert cards
     assert referenced_answer_ratio(questions) == 1.0
     assert referenced_answer_ratio(cards) == 1.0
+
+    normalized_questions = [question_key(item_field(item, "question")) for item in questions]
+    assert len(normalized_questions) == len(set(normalized_questions))
+    assert {item_field(item, "category") for item in questions} == {"basicas", "comprension", "practicas"}
+    assert all("type::" in item_field(card, "tags") for card in cards)
+
+
+def question_key(question: str) -> str:
+    return " ".join(re.findall(r"[a-záéíóúñü0-9]+", question.lower()))

@@ -39,7 +39,7 @@ def test_study_markdown_is_generated_from_structured_result(tmp_path: Path) -> N
     assert "## Herramientas" in content
     assert "### tailscale" in content
     assert "## Flashcards" in content
-    assert "_Formato de análisis: 1_" in content
+    assert "_Formato de análisis: 2_" in content
 
 
 def test_info_written_by_pipeline_contains_analysis_metadata(tmp_path: Path) -> None:

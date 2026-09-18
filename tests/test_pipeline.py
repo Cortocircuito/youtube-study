@@ -65,7 +65,7 @@ def test_generate_study_files_writes_all_artifacts_from_one_analysis(tmp_path: P
     assert tailscale["category"] == "service"
     assert tailscale["kind"] == "known"
     assert concepts and {"name", "score", "count", "timestamps"}.issubset(concepts[0])
-    assert info["analysis"]["format_version"] == 1
+    assert info["analysis"]["format_version"] == 2
     assert "# Estudio consolidado: Demo Ñ" in study
     assert "### tailscale" in study
     assert "video::demo" in anki
