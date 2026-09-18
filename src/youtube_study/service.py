@@ -37,21 +37,22 @@ def generate_study_files(info: VideoInfo, video_dir: Path, subtitle: SubtitleSel
         raise VideoDataError("No se puede analizar un video sin id.")
     result = analyze_cues(clean_vtt(subtitle.path))
     title = info.get("title", video_id)
+    source_url = info.get("webpage_url")
 
     write_info(video_dir / "info.json", info, subtitle, analysis_version=result.format_version)
     write_transcript(video_dir / "transcript.txt", result.cues)
     write_clean_transcript(video_dir / "transcript.clean.txt", result.cues)
     write_transcript_paragraphs(video_dir / "transcript.paragraphs.md", result.cues)
-    write_summary(video_dir / "summary.md", title, result.keywords, result.ideas, result.sections)
+    write_summary(video_dir / "summary.md", title, result.keywords, result.ideas, result.sections, source_url)
     write_tools(video_dir / "tools.md", result.tools)
     write_tools_json(video_dir / "tools.json", result.tools)
     write_concepts(video_dir / "concepts.md", result.sections)
     write_concepts_json(video_dir / "concepts.json", result.concepts)
-    write_questions(video_dir / "questions.md", result.questions)
-    write_flashcards(video_dir / "flashcards.md", result.cards)
+    write_questions(video_dir / "questions.md", result.questions, source_url)
+    write_flashcards(video_dir / "flashcards.md", result.cards, source_url)
     write_study_guide(video_dir / "study-guide.md", title, result.tools, result.questions)
-    write_study_markdown_from_result(video_dir / "study.md", title, result)
-    write_anki_csv(video_dir / "anki.csv", result.cards, video_id, info.get("uploader"))
+    write_study_markdown_from_result(video_dir / "study.md", title, result, source_url)
+    write_anki_csv(video_dir / "anki.csv", result.cards, video_id, info.get("uploader"), source_url)
     upsert_video(library_path, info, video_dir, result.tools)
     return video_dir
 
@@ -93,13 +94,14 @@ def export_study(video_id: str, out: Path, languages: str, export_format: str) -
     info, video_dir, subtitle = load_existing_video(video_id, out, languages)
     result = analyze_cues(clean_vtt(subtitle.path))
     title = info.get("title", video_id)
+    source_url = info.get("webpage_url")
     written: list[Path] = []
     if export_format in {"markdown", "all"}:
         study_path = video_dir / "study.md"
-        write_study_markdown_from_result(study_path, title, result)
+        write_study_markdown_from_result(study_path, title, result, source_url)
         written.append(study_path)
     if export_format in {"anki", "all"}:
         anki_path = video_dir / "anki.csv"
-        write_anki_csv(anki_path, result.cards, video_id, info.get("uploader"))
+        write_anki_csv(anki_path, result.cards, video_id, info.get("uploader"), source_url)
         written.append(anki_path)
     return written

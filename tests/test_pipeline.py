@@ -31,7 +31,12 @@ def test_generate_study_files_writes_all_artifacts_from_one_analysis(tmp_path: P
     )
 
     generate_study_files(
-        {"id": "demo", "title": "Demo Ñ", "uploader": "Canal Ñ"},
+        {
+            "id": "demo",
+            "title": "Demo Ñ",
+            "uploader": "Canal Ñ",
+            "webpage_url": "https://www.youtube.com/watch?v=demo",
+        },
         video_dir,
         selection,
         tmp_path / "library.json",
@@ -58,6 +63,9 @@ def test_generate_study_files_writes_all_artifacts_from_one_analysis(tmp_path: P
     tools = json.loads((video_dir / "tools.json").read_text(encoding="utf-8"))
     concepts = json.loads((video_dir / "concepts.json").read_text(encoding="utf-8"))
     info = json.loads((video_dir / "info.json").read_text(encoding="utf-8"))
+    summary = (video_dir / "summary.md").read_text(encoding="utf-8")
+    questions = (video_dir / "questions.md").read_text(encoding="utf-8")
+    flashcards = (video_dir / "flashcards.md").read_text(encoding="utf-8")
     study = (video_dir / "study.md").read_text(encoding="utf-8")
     anki = (video_dir / "anki.csv").read_text(encoding="utf-8-sig")
 
@@ -68,6 +76,12 @@ def test_generate_study_files_writes_all_artifacts_from_one_analysis(tmp_path: P
     assert info["analysis"]["format_version"] == 2
     assert "# Estudio consolidado: Demo Ñ" in study
     assert "### tailscale" in study
+    reference = "https://www.youtube.com/watch?v=demo&t=1"
+    assert reference in summary
+    assert reference in questions
+    assert reference in flashcards
+    assert reference in study
+    assert "https://www.youtube.com/watch?v=demo&amp;t=1" in anki
     assert "video::demo" in anki
     assert "channel::Canal_Ñ" in anki
 
@@ -78,7 +92,15 @@ def test_export_study_recomputes_markdown_and_anki_from_subtitle(tmp_path: Path)
     subtitle_path = video_dir / "demo.es.vtt"
     write_demo_vtt(subtitle_path)
     (video_dir / "info.json").write_text(
-        json.dumps({"id": "demo", "title": "Demo", "uploader": "Canal", "source_subtitle": str(subtitle_path)}),
+        json.dumps(
+            {
+                "id": "demo",
+                "title": "Demo",
+                "uploader": "Canal",
+                "webpage_url": "https://youtu.be/demo?si=share",
+                "source_subtitle": str(subtitle_path),
+            }
+        ),
         encoding="utf-8",
     )
     (video_dir / "summary.md").write_text("# Resumen\n\nCONTENIDO OBSOLETO", encoding="utf-8")
@@ -91,4 +113,6 @@ def test_export_study_recomputes_markdown_and_anki_from_subtitle(tmp_path: Path)
     anki = (video_dir / "anki.csv").read_text(encoding="utf-8-sig")
     assert "CONTENIDO OBSOLETO" not in study
     assert "### tailscale" in study
+    assert "https://youtu.be/demo?si=share&t=1" in study
+    assert "https://youtu.be/demo?si=share&amp;t=1" in anki
     assert "video::demo" in anki

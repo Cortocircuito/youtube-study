@@ -2,7 +2,7 @@
 title: "Mejorar calidad y referencias del material de estudio"
 status: draft
 created: "2026-09-18T22:35:24.068Z"
-updated: "2026-09-18T22:55:51.411Z"
+updated: "2026-09-18T23:04:48.855Z"
 type: feature
 ---
 
@@ -82,19 +82,26 @@ Criterio de aceptación cumplido: 100% de preguntas y tarjetas de fixtures tiene
 
 ## Fase 4 — Enlaces temporales y exportadores
 
-1. Crear helper puro de timestamp a enlace que soporte query previa y URL ausente.
-2. Pasar contexto de fuente a exportadores sin acoplar analyzer con YouTube.
-3. Mostrar timestamp enlazado en `summary.md`, `questions.md`, `flashcards.md` y `study.md`.
-4. Añadir referencia al reverso de `anki.csv`, preservando columnas y UTF-8 BOM.
-5. Añadir referencias a JSON solo si resulta necesario; no cambiar `tools.json`/`concepts.json` sin motivo.
+**Estado: [DONE:5]**
 
-Verificación:
+1. [DONE:1] Se añadieron `timestamp_url()`, `markdown_reference()` y `anki_answer_with_reference()`; conservan query/fragmento, reemplazan `t` previo y rechazan URLs inválidas.
+2. [DONE:2] `service.py` pasa `webpage_url` como contexto a los exportadores, sin acoplar el analizador con YouTube.
+3. [DONE:3] `summary.md`, `questions.md`, `flashcards.md` y `study.md` muestran timestamps enlazados; sin URL conservan `[HH:MM:SS]` legible.
+4. [DONE:4] Anki conserva `Front`, `Back`, `Tags` y UTF-8 BOM; el reverso añade una referencia HTML clicable o un timestamp sin enlace.
+5. [DONE:5] No se añadieron salidas JSON nuevas ni se modificaron `tools.json`/`concepts.json`; los tests cubren YouTube, `youtu.be`, query previa, reemplazo de tiempo y fallback.
+
+Verificación ejecutada:
 
 ```bash
-python -m pytest tests/test_exporter.py tests/test_pipeline.py -q
+.venv/bin/python -m ruff format --check .
+.venv/bin/python -m ruff check .
+.venv/bin/python -m py_compile app.py src/youtube_study/*.py
+.venv/bin/python -m pytest -q
 ```
 
-Criterio de aceptación: enlaces al segundo correcto, fallback a timestamp y CSV importable.
+Resultado: `40 passed`. Se revisó Markdown y Anki generados desde el fixture pequeño de horticultura; los enlaces apuntan a los segundos esperados.
+
+Criterio de aceptación cumplido: enlaces correctos con URL, fallback temporal sin URL y CSV compatible con sus tres columnas.
 
 ⏸️ PAUSA — Revisar Markdown y una importación manual opcional de Anki.
 

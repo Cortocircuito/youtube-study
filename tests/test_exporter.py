@@ -4,8 +4,13 @@ import csv
 import json
 from pathlib import Path
 
-from src.youtube_study.analyzer import analyze_cues
-from src.youtube_study.exporter import write_anki_csv, write_study_markdown_from_result
+from src.youtube_study.analyzer import Flashcard, analyze_cues
+from src.youtube_study.exporter import (
+    markdown_reference,
+    timestamp_url,
+    write_anki_csv,
+    write_study_markdown_from_result,
+)
 from src.youtube_study.transcript import Cue
 
 
@@ -23,6 +28,28 @@ def test_write_anki_csv_preserves_utf8_quotes_and_tags(tmp_path: Path) -> None:
     assert rows[0]["Tags"] == "video::vídeo-ñ channel::Canal_Ñ tool ssh"
 
 
+def test_timestamp_url_preserves_query_replaces_time_and_supports_fallback() -> None:
+    source = "https://www.youtube.com/watch?v=abc&t=4&list=xyz#chapter"
+
+    assert timestamp_url(source, "00:01:23") == ("https://www.youtube.com/watch?v=abc&list=xyz&t=83#chapter")
+    assert timestamp_url("https://youtu.be/abc?si=share", "01:00:01") == "https://youtu.be/abc?si=share&t=3601"
+    assert timestamp_url(None, "00:01:23") is None
+    assert timestamp_url("not-a-url", "00:01:23") is None
+    assert markdown_reference("00:01:23", None) == "[00:01:23]"
+
+
+def test_anki_csv_adds_clickable_reference_without_changing_columns(tmp_path: Path) -> None:
+    path = tmp_path / "anki.csv"
+    card = Flashcard("Pregunta", "Respuesta", "00:01:23", "Fuente", "question type::basicas")
+
+    write_anki_csv(path, [card], "demo", source_url="https://youtu.be/abc?si=share")
+
+    rows = list(csv.DictReader(path.open(encoding="utf-8-sig", newline="")))
+    assert list(rows[0]) == ["Front", "Back", "Tags"]
+    assert 'href="https://youtu.be/abc?si=share&amp;t=83"' in rows[0]["Back"]
+    assert "Referencia:" in rows[0]["Back"]
+
+
 def test_study_markdown_is_generated_from_structured_result(tmp_path: Path) -> None:
     result = analyze_cues(
         [
@@ -32,7 +59,7 @@ def test_study_markdown_is_generated_from_structured_result(tmp_path: Path) -> N
     )
 
     path = tmp_path / "study.md"
-    write_study_markdown_from_result(path, "Guía Ñ", result)
+    write_study_markdown_from_result(path, "Guía Ñ", result, "https://youtu.be/demo")
 
     content = path.read_text(encoding="utf-8")
     assert content.startswith("# Estudio consolidado: Guía Ñ")
@@ -40,6 +67,7 @@ def test_study_markdown_is_generated_from_structured_result(tmp_path: Path) -> N
     assert "### tailscale" in content
     assert "## Flashcards" in content
     assert "_Formato de análisis: 2_" in content
+    assert "[00:00:01](https://youtu.be/demo?t=1)" in content
 
 
 def test_info_written_by_pipeline_contains_analysis_metadata(tmp_path: Path) -> None:
