@@ -1,0 +1,27 @@
+WEBVTT
+Kind: captions
+Language: es
+
+00:00:02.000 --> 00:00:07.000
+Antes de optimizar una base de datos hay que medir las consultas lentas con datos representativos.
+
+00:00:07.000 --> 00:00:13.000
+Antes de optimizar una base de datos hay que medir las consultas lentas con datos representativos. El plan de ejecución muestra dónde se consume tiempo.
+
+00:00:15.000 --> 00:00:21.000
+Un índice puede acelerar las lecturas pero también aumenta el coste de escritura y ocupa almacenamiento.
+
+00:00:23.000 --> 00:00:29.000
+No conviene crear índices para cada columna porque cada índice penaliza inserciones y actualizaciones.
+
+00:00:31.000 --> 00:00:37.000
+Las transacciones agrupan cambios relacionados y permiten revertirlos si una operación falla.
+
+00:00:39.000 --> 00:00:45.000
+Una copia de seguridad solo es útil cuando se verifica mediante una restauración de prueba.
+
+00:00:47.000 --> 00:00:53.000
+Probar la restauración confirma que el respaldo contiene los datos y que el procedimiento funciona.
+
+00:00:55.000 --> 00:01:02.000
+Después de cada cambio compara latencia, consumo de recursos y resultados antes de seguir optimizando.

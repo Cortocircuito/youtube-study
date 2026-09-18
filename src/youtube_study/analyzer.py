@@ -39,6 +39,13 @@ class ConceptMention:
     timestamps: list[str]
 
 
+@dataclass(frozen=True)
+class TextWindow:
+    timestamp: str
+    text: str
+    position: int
+
+
 @dataclass
 class AnalysisResult:
     cues: list[Cue]
@@ -116,59 +123,99 @@ def detect_unknown_tools(text: str, known_names: set[str], limit: int = 8) -> li
 
 
 def split_sentences(text: str) -> list[str]:
-    parts = re.split(r"(?<=[.!?])\s+", text)
-    if len(parts) < 10:
-        parts = re.split(r"\s+(?=(?:Entonces|Ahora|Bien|Primero|Segundo|Tercero|Si vos|La idea)\b)", text)
-    return [p.strip() for p in parts if len(p.strip()) > 60]
+    normalized = re.sub(r"\s+", " ", text).strip()
+    if not normalized:
+        return []
+    parts = re.split(r"(?<=[.!?])\s+", normalized)
+    if len(parts) == 1:
+        parts = re.split(r"\s+(?=(?:Entonces|Ahora|Bien|Primero|Segundo|Tercero|Si vos|La idea)\b)", normalized)
+    return [part.strip() for part in parts if len(part.strip()) >= 50]
+
+
+def content_tokens(text: str) -> set[str]:
+    words = re.findall(r"[a-záéíóúñü0-9][a-záéíóúñü0-9_.-]{2,}", text.lower())
+    return {word.strip(".-_") for word in words if word.strip(".-_") not in STOPWORDS and not word.isdigit()}
+
+
+def token_similarity(left: str, right: str) -> float:
+    left_tokens = content_tokens(left)
+    right_tokens = content_tokens(right)
+    if not left_tokens or not right_tokens:
+        return 0.0
+    return len(left_tokens & right_tokens) / len(left_tokens | right_tokens)
+
+
+def deduplicate_texts(texts: list[str], threshold: float = 0.72) -> list[str]:
+    unique: list[str] = []
+    for text in texts:
+        if any(token_similarity(text, previous) >= threshold for previous in unique):
+            continue
+        unique.append(text)
+    return unique
+
+
+def cue_windows(cues: list[Cue], size: int = 3) -> list[TextWindow]:
+    """Build chronological, non-overlapping windows while dropping near-duplicate cues."""
+    unique_cues: list[Cue] = []
+    for cue in cues:
+        if any(token_similarity(cue.text, previous.text) >= 0.72 for previous in unique_cues[-8:]):
+            continue
+        unique_cues.append(cue)
+
+    windows: list[TextWindow] = []
+    for index in range(0, len(unique_cues), size):
+        chunk = unique_cues[index : index + size]
+        if chunk:
+            windows.append(TextWindow(chunk[0].start, " ".join(cue.text for cue in chunk), index))
+    return windows
+
+
+def text_score(text: str, frequencies: dict[str, int], position: int = 0) -> float:
+    tokens = content_tokens(text)
+    words = re.findall(r"[a-záéíóúñü0-9_.-]+", text.lower())
+    keyword_weight = sum(frequencies.get(token, 0) for token in tokens)
+    density = len(tokens) / max(len(words), 1)
+    length_score = min(len(words), 60) / 60
+    position_bonus = 1 / (position + 2)
+    short_penalty = 3 if len(words) < 10 else 0
+    return keyword_weight + density * 3 + length_score + position_bonus - short_penalty
+
+
+def representative_sentences(text: str, limit: int = 3) -> list[str]:
+    candidates = deduplicate_texts(split_sentences(text))
+    if not candidates:
+        excerpt = text[:240].strip()
+        return [f"{excerpt}..." if len(text) > 240 else excerpt] if excerpt else []
+    frequencies = dict(keywords(text, 20))
+    ranked = sorted(
+        enumerate(candidates),
+        key=lambda item: text_score(item[1], frequencies, item[0]),
+        reverse=True,
+    )
+    chosen = sorted(ranked[:limit], key=lambda item: item[0])
+    return [sentence for _, sentence in chosen]
 
 
 def important_ideas(cues: list[Cue], limit: int = 12) -> list[tuple[str, str]]:
-    text = full_text(cues)
-    top_words = {w for w, _ in keywords(text, 20)}
-    # Agrupamos varias líneas de subtítulos para evitar frases cortadas.
-    grouped: list[tuple[str, str]] = []
-    for i in range(0, len(cues), 3):
-        chunk = cues[i : i + 3]
-        if not chunk:
-            continue
-        grouped.append((chunk[0].start, " ".join(c.text for c in chunk)))
+    windows = cue_windows(cues)
+    frequencies = dict(keywords(full_text(cues), 25))
+    scored = [(text_score(window.text, frequencies, window.position), window) for window in windows]
 
-    scored: list[tuple[float, str, str]] = []
-    priority = [
-        "instal",
-        "config",
-        "ssh",
-        "tailscale",
-        "puerto",
-        "llave",
-        "teléfono",
-        "notificacion",
-        "agente",
-        "multiplex",
-        "hook",
-        "qr",
-        "token",
-        "firewall",
-    ]
-    for ts, sent in grouped:
-        low = sent.lower()
-        ws = re.findall(r"[a-záéíóúñü0-9_.-]{3,}", low)
-        score = sum(1 for w in ws if w in top_words)
-        score += sum(3 for p in priority if p in low)
-        score += min(len(ws), 60) / 60
-        if len(ws) < 12:
-            score -= 4
-        scored.append((score, ts, sent))
-    selected = sorted(scored, reverse=True)[:limit]
-    return [(ts, sent) for _, ts, sent in sorted(selected, key=lambda x: x[1])]
+    selected: list[TextWindow] = []
+    for _, window in sorted(scored, key=lambda item: item[0], reverse=True):
+        if any(token_similarity(window.text, previous.text) >= 0.72 for previous in selected):
+            continue
+        selected.append(window)
+        if len(selected) >= limit:
+            break
+    return [(window.timestamp, window.text) for window in sorted(selected, key=lambda item: item.position)]
 
 
 def section_summaries(cues: list[Cue], minutes: int = 5) -> list[tuple[str, str, list[str]]]:
     sections = []
     for start, end, text in chunk_by_minutes(cues, minutes):
-        kws = [w for w, _ in keywords(text, 8)]
-        sentences = split_sentences(text)
-        ideas = sentences[:3] if sentences else [text[:240].strip() + "..."]
+        kws = [word for word, _ in keywords(text, 8)]
+        ideas = representative_sentences(text)
         sections.append((f"{start} - {end}", ", ".join(kws[:5]), ideas))
     return sections
 
