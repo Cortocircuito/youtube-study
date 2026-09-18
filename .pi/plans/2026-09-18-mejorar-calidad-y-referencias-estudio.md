@@ -2,7 +2,7 @@
 title: "Mejorar calidad y referencias del material de estudio"
 status: draft
 created: "2026-09-18T22:35:24.068Z"
-updated: "2026-09-18T23:04:48.855Z"
+updated: "2026-09-18T23:09:54.334Z"
 type: feature
 ---
 
@@ -107,25 +107,29 @@ Criterio de aceptación cumplido: enlaces correctos con URL, fallback temporal s
 
 ## Fase 5 — Integración, migración y cierre
 
-1. Adaptar `generate_study_files()` y `export_study()` para el mismo `AnalysisResult` v2.
-2. Confirmar que `analyze VIDEO_ID` regenera v1 a v2 desde datos locales sin red.
-3. Actualizar README y `AGENTS.md`.
-4. Ejecutar suite completa y smoke tests CLI sin red ni datos reales.
-5. Revisar diff, compatibilidad del atajo principal y cerrar tras CI verde.
+**Estado: [DONE:4] — cierre remoto pendiente**
 
-Verificación:
+1. [DONE:1] `generate_study_files()` y `export_study()` generan Markdown y Anki desde el mismo `AnalysisResult` v2 y comparten contexto de fuente.
+2. [DONE:2] Se añadió una prueba que migra artefactos v1 con `analyze_existing()` usando subtítulos locales: actualiza metadata a v2, elimina placeholders y conserva enlaces, sin red.
+3. [DONE:3] `README.md`, `AGENTS.md` y `PLAN.md` reflejan análisis v2, referencias temporales, regeneración local y prioridades actuales.
+4. [DONE:4] Pasaron smoke tests de `--help`, `list`, `rebuild-library`, atajo URL simulado y migración v1→v2, además de la validación completa equivalente a CI.
+5. [PENDING] El diff está revisado y el contrato `python app.py "URL"` está cubierto; falta commit, push y confirmar CI verde antes de cerrar el plan.
+
+Verificación ejecutada:
 
 ```bash
-python app.py --help
-python -m ruff format --check .
-python -m ruff check .
-python -m py_compile app.py src/youtube_study/*.py
-python -m pytest
+.venv/bin/python app.py --help
+.venv/bin/python -m ruff format --check .
+.venv/bin/python -m ruff check .
+.venv/bin/python -m py_compile app.py src/youtube_study/*.py
+.venv/bin/python -m pytest -q
 ```
 
-Criterio de aceptación: suite verde, contrato CLI intacto y análisis v2 verificable sin placeholders.
+Resultado local: `41 passed`; Ruff, formato, compilación y `git diff --check` correctos.
 
-⏸️ PAUSA FINAL — Revisar artefactos, documentación y CI antes de cerrar.
+Criterio local cumplido: migración v2, documentación, CLI y suite están validados sin red. El criterio final requiere CI remoto verde.
+
+⏸️ PAUSA FINAL — Autorizar commit/push y confirmar CI antes de marcar `[DONE:5]` y cerrar.
 
 ## Riesgos y mitigaciones
 

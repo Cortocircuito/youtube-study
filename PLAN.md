@@ -1,74 +1,48 @@
-# Plan de evolución de YouTube Study
+# Roadmap de YouTube Study
 
 ## Estado actual
 
-La aplicación ya permite:
+La aplicación funciona localmente sin Ollama y permite:
 
-- Descargar subtítulos de YouTube con `yt-dlp`.
-- Limpiar transcripciones `.vtt`.
-- Generar `transcript.txt`.
-- Detectar herramientas conocidas.
-- Crear `summary.md`, `tools.md`, `concepts.md`, `questions.md`, `flashcards.md` y `study-guide.md`.
+- Descargar y seleccionar subtítulos con `yt-dlp`.
+- Limpiar captions automáticos y generar transcripciones legibles.
+- Crear resúmenes extractivos deduplicados, conceptos, preguntas respondidas y flashcards.
+- Referenciar el instante del video desde Markdown y Anki.
+- Mantener `data/library.json` y usar `list`, `show`, `search`, `analyze`, `export` y `rebuild-library`.
+- Regenerar análisis antiguos al formato v2 sin red cuando los subtítulos ya están guardados.
+- Validar cambios mediante Ruff, compilación, pytest y GitHub Actions.
 
-## Prioridad actual
+## Prioridades próximas sin IA
 
-De momento **no usaremos Ollama**. Primero vamos a mejorar la aplicación sin depender de IA local.
+1. Ampliar fixtures de subtítulos automáticos ruidosos y mejorar puntuación/separación de párrafos.
+2. Refinar conceptos y formulación de preguntas con métricas pedagógicas conservadoras.
+3. Medir cobertura de tests e identificar módulos críticos antes de fijar un umbral.
+4. Mejorar filtros de biblioteca por canal, herramienta, tema y estado de estudio.
+5. Reforzar reintentos y recuperación ante fallos temporales de descarga sin sobrescribir resultados válidos.
 
-### Próximas mejoras sin IA
+## Posibles mejoras posteriores
 
-1. Mejorar limpieza de subtítulos.
-2. Mejorar detección de herramientas y conceptos.
-3. Añadir una biblioteca local de videos estudiados.
-4. Añadir comandos CLI:
-   - `list`
-   - `show`
-   - `search`
-   - `clean`
-5. Añadir búsqueda textual dentro de transcripciones.
-6. Añadir exportación a formatos útiles:
-   - Markdown consolidado
-   - Anki CSV
-   - PDF más adelante
-7. Añadir soporte para videos sin subtítulos usando Whisper como alternativa futura opcional.
+- Exportación PDF.
+- Whisper opcional para videos sin subtítulos.
+- Búsqueda semántica local.
+- Interfaz gráfica o web.
 
-## Plan futuro: Ollama
+## Ollama, fase futura opcional
 
-Ollama queda reservado como mejora futura para generar análisis más inteligentes manteniendo privacidad y sin coste por tokens.
+Ollama no es necesario para el funcionamiento principal. Si se incorpora, deberá ser un proveedor opcional y mantener el flujo heurístico actual como fallback.
 
-### Objetivos con Ollama
+Objetivos posibles:
 
-- Resúmenes de mayor calidad.
-- Explicación de conceptos con contexto.
-- Detección automática de herramientas aunque no estén en una lista conocida.
-- Preguntas de repaso más útiles.
-- Flashcards mejores.
-- Respuestas a preguntas sobre el video usando la transcripción.
+- Resúmenes y explicaciones más naturales.
+- Preguntas de repaso de mayor profundidad.
+- Detección contextual de herramientas y conceptos.
+- Preguntas y respuestas sobre una transcripción.
 
-### Posible flujo futuro
+Ejemplo futuro:
 
 ```bash
-ollama pull llama3.1
 python app.py study URL --provider ollama
 python app.py ask VIDEO_ID "¿Cómo configura SSH?"
 ```
 
-### Archivos o módulos futuros
-
-```txt
-src/youtube_study/ai/
-├── __init__.py
-├── ollama.py
-├── prompts.py
-└── schemas.py
-```
-
-### Modelos candidatos
-
-- `llama3.1`
-- `qwen2.5`
-- `mistral`
-- modelos pequeños para equipos modestos
-
-## Nota
-
-Ollama no es necesario para el MVP. La prioridad es construir primero una buena herramienta de estudio estable, rápida y local.
+La integración no debe enviar contenido a servicios externos por defecto ni romper el modo completamente local actual.

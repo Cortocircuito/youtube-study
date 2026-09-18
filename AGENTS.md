@@ -2,7 +2,7 @@
 
 ## Proyecto
 
-`youtube-study` es una aplicación Python para estudiar videos de YouTube a partir de sus transcripciones.
+`youtube-study` es una aplicación Python para estudiar videos de YouTube a partir de sus transcripciones. El análisis actual es v2 y genera material extractivo con referencias temporales verificables.
 
 ## Objetivo
 
@@ -89,15 +89,18 @@ PLAN.md                          # roadmap futuro del proyecto
 - Al ejecutar planes con `openplan`, avanzar por fases cortas y pausar después de máximo 5 pasos.
 - Preferir módulos pequeños dentro de `src/youtube_study/`.
 - Cada mejora debe mantener funcionando el comando `python app.py "URL"`.
+- Preguntas y flashcards deben conservar respuesta extractiva, timestamp y extracto fuente; no reintroducir respuestas placeholder.
+- Los exportadores deben degradar a timestamp legible cuando `webpage_url` no exista.
+- Los cambios incompatibles en artefactos deben incrementar `ANALYSIS_FORMAT_VERSION` y permitir regeneración local mediante `analyze`.
 - Después de cambios en código Python, ejecutar `python -m ruff check .`, `python -m py_compile app.py src/youtube_study/*.py` y `python -m pytest`.
 - La CI no debe descargar videos, leer datos reales de `data/`, ni usar Ollama, API keys o red; usar fixtures pequeños en `tests/`.
 
 ## Prioridades actuales
 
-1. Mejorar la limpieza de subtítulos automáticos ruidosos.
-2. Mejorar la precisión de herramientas, candidatos y conceptos mediante fixtures y tests de regresión.
+1. Mejorar la limpieza de subtítulos automáticos ruidosos con fixtures variados.
+2. Refinar la utilidad pedagógica de preguntas y conceptos sin introducir sesgos de dominio.
 3. Ampliar cobertura de tests de los módulos críticos sin imponer umbral hasta medir la situación.
-4. Mantener README, dependencias, Ruff y CI alineados con el comportamiento real.
+4. Mantener compatibilidad de regeneración entre versiones de análisis.
 5. Evaluar exportación PDF y búsqueda semántica solo después de estabilizar el flujo local.
 
 ## Futuro

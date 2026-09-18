@@ -6,7 +6,8 @@ Aplicación local para estudiar videos de YouTube a partir de sus subtítulos, s
 
 - Descarga subtítulos con `yt-dlp` y elige de forma preferente español manual, español automático original, traducción solicitada, inglés y un fallback controlado.
 - Limpia subtítulos VTT, elimina solapamientos de captions automáticos y normaliza aliases frecuentes.
-- Genera resúmenes, conceptos, preguntas, flashcards, guía de estudio, un Markdown consolidado y CSV para Anki.
+- Genera resúmenes extractivos deduplicados, conceptos, preguntas respondidas, flashcards, guía de estudio, un Markdown consolidado y CSV para Anki.
+- Añade referencias al instante exacto del video en resúmenes, preguntas, tarjetas y Anki cuando la URL está disponible.
 - Mantiene una biblioteca local y permite listar, consultar, buscar, reanalizar y exportar videos.
 - Clasifica hallazgos como herramienta, protocolo, modelo, servicio o candidato heurístico.
 
@@ -85,14 +86,16 @@ study.md
 anki.csv
 ```
 
-`tools.json` y `tools.md` incluyen la categoría y procedencia de cada hallazgo. `anki.csv` incorpora tags de video, canal, categoría y procedencia.
+`tools.json` y `tools.md` incluyen la categoría y procedencia de cada hallazgo. `anki.csv` incorpora tags de video, canal, categoría, procedencia y tipo de pregunta.
+
+El formato de análisis actual es **v2**. Las preguntas y flashcards contienen una respuesta extractiva, un timestamp y un fragmento fuente. `python app.py analyze VIDEO_ID` regenera análisis antiguos desde los subtítulos locales, sin descargar de nuevo el video.
 
 ## Flujo de estudio recomendado
 
 1. Lee `summary.md`.
 2. Revisa `tools.md` y `concepts.md`.
-3. Responde `questions.md` sin mirar la transcripción.
-4. Repasa `flashcards.md` o importa `anki.csv` en Anki.
+3. Intenta responder `questions.md` antes de consultar la respuesta extractiva y su referencia.
+4. Repasa `flashcards.md` o importa `anki.csv` en Anki; abre el timestamp para verificar el contexto.
 5. Usa `study.md` si prefieres un único documento.
 
 ## Desarrollo

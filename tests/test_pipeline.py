@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from src.youtube_study.downloader import SubtitleSelection
-from src.youtube_study.service import export_study, generate_study_files
+from src.youtube_study.service import analyze_existing, export_study, generate_study_files
 
 
 def write_demo_vtt(path: Path) -> None:
@@ -84,6 +84,36 @@ def test_generate_study_files_writes_all_artifacts_from_one_analysis(tmp_path: P
     assert "https://www.youtube.com/watch?v=demo&amp;t=1" in anki
     assert "video::demo" in anki
     assert "channel::Canal_Ñ" in anki
+
+
+def test_analyze_existing_migrates_v1_artifacts_to_v2_without_network(tmp_path: Path) -> None:
+    video_dir = tmp_path / "videos" / "legacy"
+    video_dir.mkdir(parents=True)
+    subtitle_path = video_dir / "legacy.es.vtt"
+    write_demo_vtt(subtitle_path)
+    (video_dir / "info.json").write_text(
+        json.dumps(
+            {
+                "id": "legacy",
+                "title": "Análisis antiguo",
+                "webpage_url": "https://youtu.be/legacy",
+                "source_subtitle": str(subtitle_path),
+                "analysis": {"format_version": 1},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (video_dir / "flashcards.md").write_text(
+        "Respóndelo usando la sección correspondiente de la transcripción.", encoding="utf-8"
+    )
+
+    analyzed_dir = analyze_existing("legacy", tmp_path / "videos", "es")
+
+    info = json.loads((analyzed_dir / "info.json").read_text(encoding="utf-8"))
+    flashcards = (analyzed_dir / "flashcards.md").read_text(encoding="utf-8")
+    assert info["analysis"]["format_version"] == 2
+    assert "Respóndelo usando" not in flashcards
+    assert "https://youtu.be/legacy?t=1" in flashcards
 
 
 def test_export_study_recomputes_markdown_and_anki_from_subtitle(tmp_path: Path) -> None:
