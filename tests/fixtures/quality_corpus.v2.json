@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "cases": [
     {
       "id": "gardening",
@@ -22,6 +22,23 @@
         {"id": "preparar_suelo", "category": "practicas", "prompt_groups": [["cultivar", "suelo"]], "answer_groups": [["suelo"], ["compost"]], "timestamps": ["00:00:01"]},
         {"id": "mantener_humedad", "category": "practicas", "prompt_groups": [["humedad", "riego"]], "answer_groups": [["humedad"], ["estrés"], ["agrieten", "grietas"]], "timestamps": ["00:00:20"]},
         {"id": "riego_profundo", "category": "basicas", "prompt_groups": [["riego"]], "answer_groups": [["profundo"], ["raíces"]], "timestamps": ["00:00:12"]}
+      ],
+      "concept_targets": [
+        {"id": "materia_organica", "aliases": ["materia orgánica"], "timestamps": ["00:00:05"], "compound": true},
+        {"id": "humedad_estable", "aliases": ["humedad estable"], "timestamps": ["00:00:20", "00:00:28"], "compound": true},
+        {"id": "espacio_plantas", "aliases": ["espacio entre plantas"], "timestamps": ["00:00:44"], "compound": true},
+        {"id": "humedad", "aliases": ["humedad"], "timestamps": ["00:00:12", "00:00:20", "00:00:28", "00:00:52"], "compound": false},
+        {"id": "riesgo_hongos", "aliases": ["riesgo de hongos"], "timestamps": ["00:00:36"], "compound": true},
+        {"id": "tomates_sanos", "aliases": ["tomates sanos"], "timestamps": ["00:00:01"], "compound": true},
+        {"id": "buena_ventilacion", "aliases": ["buena ventilación"], "timestamps": ["00:00:44"], "compound": true},
+        {"id": "cerca_suelo", "aliases": ["cerca del suelo"], "timestamps": ["00:00:36"], "compound": true},
+        {"id": "suelo", "aliases": ["suelo"], "timestamps": ["00:00:01", "00:00:36"], "compound": false},
+        {"id": "raices", "aliases": ["raíces"], "timestamps": ["00:00:05", "00:00:12"], "compound": false},
+        {"id": "riego", "aliases": ["riego"], "timestamps": ["00:00:12", "00:00:52"], "compound": false},
+        {"id": "estres", "aliases": ["estrés"], "timestamps": ["00:00:20", "00:00:28"], "compound": false},
+        {"id": "frutos", "aliases": ["frutos"], "timestamps": ["00:00:20", "00:00:28"], "compound": false},
+        {"id": "planta", "aliases": ["planta"], "timestamps": ["00:00:20", "00:00:28"], "compound": false},
+        {"id": "hojas", "aliases": ["hojas"], "timestamps": ["00:00:36", "00:00:52"], "compound": false}
       ]
     },
     {
@@ -46,6 +63,22 @@
         {"id": "coste_indice", "category": "basicas", "prompt_groups": [["índice"]], "answer_groups": [["lecturas"], ["escritura"], ["almacenamiento"]], "timestamps": ["00:00:15"]},
         {"id": "medir_antes", "category": "practicas", "prompt_groups": [["datos", "optimizar"]], "answer_groups": [["medir"], ["consultas lentas"]], "timestamps": ["00:00:02"]},
         {"id": "restauracion_prueba", "category": "basicas", "prompt_groups": [["restauración"]], "answer_groups": [["copia de seguridad"], ["prueba"]], "timestamps": ["00:00:39"]}
+      ],
+      "concept_targets": [
+        {"id": "base_datos", "aliases": ["base de datos"], "timestamps": ["00:00:02"], "compound": true},
+        {"id": "consultas_lentas", "aliases": ["consultas lentas"], "timestamps": ["00:00:02"], "compound": true},
+        {"id": "plan_ejecucion", "aliases": ["plan de ejecución"], "timestamps": ["00:00:07"], "compound": true},
+        {"id": "copia_seguridad", "aliases": ["copia de seguridad"], "timestamps": ["00:00:39"], "compound": true},
+        {"id": "restauracion", "aliases": ["restauración"], "timestamps": ["00:00:39", "00:00:47"], "compound": false},
+        {"id": "coste_escritura", "aliases": ["coste de escritura"], "timestamps": ["00:00:15"], "compound": true},
+        {"id": "consumo_recursos", "aliases": ["consumo de recursos"], "timestamps": ["00:00:55"], "compound": true},
+        {"id": "indice", "aliases": ["índice"], "timestamps": ["00:00:15", "00:00:23"], "compound": false},
+        {"id": "cambios_relacionados", "aliases": ["cambios relacionados"], "timestamps": ["00:00:31"], "compound": true},
+        {"id": "restauracion_prueba_concepto", "aliases": ["restauración de prueba"], "timestamps": ["00:00:39"], "compound": true},
+        {"id": "datos_representativos", "aliases": ["datos representativos"], "timestamps": ["00:00:02"], "compound": true},
+        {"id": "almacenamiento", "aliases": ["almacenamiento"], "timestamps": ["00:00:15"], "compound": false},
+        {"id": "lecturas", "aliases": ["lecturas"], "timestamps": ["00:00:15"], "compound": false},
+        {"id": "actualizaciones", "aliases": ["actualizaciones"], "timestamps": ["00:00:23"], "compound": false}
       ]
     },
     {
@@ -69,7 +102,23 @@
       "question_targets": [
         {"id": "funcion_cifrado", "category": "basicas", "prompt_groups": [["cifrado"]], "answer_groups": [["protege"], ["archivos"], ["dispositivo"]], "timestamps": ["00:00:03"]},
         {"id": "no_compartir_cuenta", "category": "practicas", "prompt_groups": [["compartir", "cuenta"]], "answer_groups": [["cuenta"], ["trazabilidad"]], "timestamps": ["00:00:24"]},
-        {"id": "revisar_permisos", "category": "basicas", "prompt_groups": [["permisos"]], "answer_groups": [["permisos"], ["restauración"]], "timestamps": ["00:00:40"]}
+        {"id": "definir_permisos", "category": "basicas", "prompt_groups": [["permisos"]], "answer_groups": [["usuarios"], ["leer", "modificar"]], "timestamps": ["00:00:16"]}
+      ],
+      "concept_targets": [
+        {"id": "clave_robusta", "aliases": ["clave robusta"], "timestamps": ["00:00:08"], "compound": true},
+        {"id": "acceso_no_autorizado", "aliases": ["acceso no autorizado"], "timestamps": ["00:00:08"], "compound": true},
+        {"id": "copias_seguridad", "aliases": ["copias de seguridad"], "timestamps": ["00:00:32"], "compound": true},
+        {"id": "restauracion_verificada", "aliases": ["restauración verificada"], "timestamps": ["00:00:48"], "compound": true},
+        {"id": "permisos", "aliases": ["permisos"], "timestamps": ["00:00:16", "00:00:40"], "compound": false},
+        {"id": "documento_compartido", "aliases": ["documento compartido"], "timestamps": ["00:00:16"], "compound": true},
+        {"id": "informacion_importante", "aliases": ["información importante"], "timestamps": ["00:00:32"], "compound": true},
+        {"id": "version_independiente", "aliases": ["versión independiente"], "timestamps": ["00:00:32"], "compound": true},
+        {"id": "archivo_pequeno", "aliases": ["archivo pequeño"], "timestamps": ["00:00:40"], "compound": true},
+        {"id": "archivos", "aliases": ["archivos"], "timestamps": ["00:00:03"], "compound": false},
+        {"id": "cifrado", "aliases": ["cifrado"], "timestamps": ["00:00:03"], "compound": false},
+        {"id": "dispositivo", "aliases": ["dispositivo"], "timestamps": ["00:00:03"], "compound": false},
+        {"id": "usuarios", "aliases": ["usuarios"], "timestamps": ["00:00:16"], "compound": false},
+        {"id": "cuenta", "aliases": ["cuenta"], "timestamps": ["00:00:24"], "compound": false}
       ]
     },
     {
@@ -97,6 +146,23 @@
         {"id": "funcion_medidor", "category": "basicas", "prompt_groups": [["medidor", "consumo"]], "answer_groups": [["potencia"], ["consumo acumulado"]], "timestamps": ["00:00:27"]},
         {"id": "sellar_primero", "category": "practicas", "prompt_groups": [["sellar", "ventanas"]], "answer_groups": [["sellar"], ["ventanas"], ["calefacción"]], "timestamps": ["00:00:50"]},
         {"id": "programar_termostato", "category": "practicas", "prompt_groups": [["termostato"]], "answer_groups": [["termostato"], ["vivienda"], ["vacía"]], "timestamps": ["00:01:13"]}
+      ],
+      "concept_targets": [
+        {"id": "medidor_enchufable", "aliases": ["medidor enchufable"], "timestamps": ["00:00:27"], "compound": true},
+        {"id": "perdida_calor", "aliases": ["pérdida de calor"], "timestamps": ["00:00:42"], "compound": true},
+        {"id": "sistema_calefaccion", "aliases": ["sistema de calefacción"], "timestamps": ["00:00:50"], "compound": true},
+        {"id": "aislamiento", "aliases": ["aislamiento"], "timestamps": ["00:00:42"], "compound": false},
+        {"id": "consumo", "aliases": ["consumo"], "timestamps": ["00:00:12", "00:00:19", "00:00:27", "00:00:58"], "compound": false},
+        {"id": "ahorro_conseguido", "aliases": ["ahorro conseguido"], "timestamps": ["00:00:58"], "compound": true},
+        {"id": "acumulado_aparato", "aliases": ["acumulado del aparato"], "timestamps": ["00:00:27"], "compound": true},
+        {"id": "vivienda", "aliases": ["vivienda"], "timestamps": ["00:00:12", "00:01:13"], "compound": false},
+        {"id": "aparato", "aliases": ["aparato"], "timestamps": ["00:00:19", "00:00:27"], "compound": false},
+        {"id": "calefaccion", "aliases": ["calefacción"], "timestamps": ["00:00:42", "00:00:50"], "compound": false},
+        {"id": "consumo_electrico", "aliases": ["consumo eléctrico"], "timestamps": ["00:00:12"], "compound": true},
+        {"id": "consumo_acumulado", "aliases": ["consumo acumulado"], "timestamps": ["00:00:27"], "compound": true},
+        {"id": "energia", "aliases": ["energía"], "timestamps": ["00:00:19"], "compound": false},
+        {"id": "potencia", "aliases": ["potencia"], "timestamps": ["00:00:27"], "compound": false},
+        {"id": "puertas", "aliases": ["puertas"], "timestamps": ["00:00:50"], "compound": false}
       ]
     }
   ]

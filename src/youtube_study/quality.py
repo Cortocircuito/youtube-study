@@ -14,16 +14,21 @@ from .analyzer import analyze_cues
 from .study_models import ANALYSIS_FORMAT_VERSION, AnalysisResult, StudyIdea, StudyQuestion, flatten_questions
 from .transcript import clean_vtt
 
-QUALITY_CORPUS_VERSION = 1
-QUALITY_METRIC_VERSION = 1
+QUALITY_CORPUS_VERSION = 2
+QUALITY_METRIC_VERSION = 2
 POSITIVE_METRICS = {
     "topic_coverage",
     "standalone_claim_coverage",
+    "concept_coverage",
+    "compound_concept_coverage",
+    "concept_timestamp_accuracy",
+    "concept_timestamp_recall",
+    "concept_precision",
     "useful_question_precision",
     "useful_question_recall",
     "useful_question_f1",
 }
-NEGATIVE_METRICS = {"noise_rule_violation_rate", "summary_duplicate_rate"}
+NEGATIVE_METRICS = {"noise_rule_violation_rate", "summary_duplicate_rate", "concept_redundancy_rate"}
 SUPPORTED_NOISE_SCOPES = {"ideas", "concepts", "question_prompts", "question_answers"}
 SUPPORTED_QUESTION_CATEGORIES = {"basicas", "comprension", "practicas"}
 TIMESTAMP_PATTERN = re.compile(r"\d{2}:\d{2}:\d{2}")
@@ -65,6 +70,14 @@ class QuestionTarget:
 
 
 @dataclass(frozen=True)
+class ConceptTarget:
+    id: str
+    aliases: tuple[str, ...]
+    timestamps: tuple[str, ...]
+    compound: bool
+
+
+@dataclass(frozen=True)
 class QualityCase:
     id: str
     profile: str
@@ -73,6 +86,7 @@ class QualityCase:
     standalone_claims: tuple[ClaimTarget, ...]
     noise_rules: tuple[NoiseRule, ...]
     question_targets: tuple[QuestionTarget, ...]
+    concept_targets: tuple[ConceptTarget, ...]
 
 
 @dataclass(frozen=True)
@@ -86,6 +100,12 @@ class QualityCorpus:
 class QualityMetrics:
     topic_coverage: float
     standalone_claim_coverage: float
+    concept_coverage: float
+    compound_concept_coverage: float
+    concept_timestamp_accuracy: float
+    concept_timestamp_recall: float
+    concept_precision: float
+    concept_redundancy_rate: float
     noise_rule_violation_rate: float
     summary_duplicate_rate: float
     useful_question_precision: float
@@ -100,6 +120,7 @@ class QualityCaseReport:
     metrics: QualityMetrics
     idea_count: int
     question_count: int
+    concept_count: int
 
 
 @dataclass(frozen=True)
@@ -215,9 +236,21 @@ def load_quality_corpus(path: Path) -> QualityCorpus:
             for raw_item in case.get("question_targets", [])
             for item in [_require_object(raw_item, f"{location}.question_targets[]")]
         )
+        concept_targets = tuple(
+            ConceptTarget(
+                id=_require_string(item.get("id"), f"{location}.concept_targets[].id"),
+                aliases=_string_list(item.get("aliases"), f"{location}.concept_targets[].aliases"),
+                timestamps=_timestamps(item.get("timestamps"), f"{location}.concept_targets[].timestamps"),
+                compound=item.get("compound"),
+            )
+            for raw_item in case.get("concept_targets", [])
+            for item in [_require_object(raw_item, f"{location}.concept_targets[]")]
+        )
 
-        if not topics or not claims or not noise_rules or not question_targets:
-            raise QualityCorpusError(f"{location} necesita topics, standalone_claims, noise_rules y question_targets")
+        if not topics or not claims or not noise_rules or not question_targets or not concept_targets:
+            raise QualityCorpusError(
+                f"{location} necesita topics, standalone_claims, noise_rules, question_targets y concept_targets"
+            )
         for rule in noise_rules:
             if rule.scope not in SUPPORTED_NOISE_SCOPES:
                 raise QualityCorpusError(f"Scope de ruido no soportado: {rule.scope}")
@@ -226,14 +259,28 @@ def load_quality_corpus(path: Path) -> QualityCorpus:
         for target in question_targets:
             if target.category not in SUPPORTED_QUESTION_CATEGORIES:
                 raise QualityCorpusError(f"Categoría de pregunta no soportada: {target.category}")
+        if any(not isinstance(target.compound, bool) for target in concept_targets):
+            raise QualityCorpusError(f"{location}.concept_targets[].compound debe ser booleano")
         for name, values in (
             ("topics", topics),
             ("standalone_claims", claims),
             ("noise_rules", noise_rules),
             ("question_targets", question_targets),
+            ("concept_targets", concept_targets),
         ):
             _unique_ids(values, f"{location}.{name}")
-        cases.append(QualityCase(case_id, profile, vtt_path, topics, claims, noise_rules, question_targets))
+        cases.append(
+            QualityCase(
+                case_id,
+                profile,
+                vtt_path,
+                topics,
+                claims,
+                noise_rules,
+                question_targets,
+                concept_targets,
+            )
+        )
 
     digest = hashlib.sha256(corpus_bytes)
     for case in cases:
@@ -310,6 +357,34 @@ def _question_matches(question: StudyQuestion, target: QuestionTarget) -> bool:
     )
 
 
+def _matching_concepts(result: AnalysisResult, target: ConceptTarget) -> list[Any]:
+    aliases = {normalize_quality_text(alias) for alias in target.aliases}
+    return [concept for concept in result.concepts if normalize_quality_text(concept.name) in aliases]
+
+
+def _concept_redundancy_rate(result: AnalysisResult) -> float:
+    pairs = 0
+    redundant = 0
+    for index, left in enumerate(result.concepts):
+        left_tokens = normalize_quality_text(left.name).split()
+        for right in result.concepts[index + 1 :]:
+            right_tokens = normalize_quality_text(right.name).split()
+            shorter, longer = sorted((left_tokens, right_tokens), key=len)
+            nested = any(
+                longer[start : start + len(shorter)] == shorter for start in range(len(longer) - len(shorter) + 1)
+            )
+            if not nested:
+                continue
+            if left.count != right.count:
+                continue
+            pairs += 1
+            left_times = set(left.timestamps)
+            right_times = set(right.timestamps)
+            overlap = len(left_times & right_times) / max(len(left_times), len(right_times))
+            redundant += overlap >= 0.8
+    return _ratio(redundant, pairs)
+
+
 def evaluate_quality_case(case: QualityCase, result: AnalysisResult | None = None) -> QualityCaseReport:
     result = result or analyze_cues(clean_vtt(case.vtt_path))
     topic_hits = sum(
@@ -322,6 +397,22 @@ def evaluate_quality_case(case: QualityCase, result: AnalysisResult | None = Non
     claim_hits = sum(
         any(matches_groups(_reference_text(idea, claim.timestamps), claim.marker_groups) for idea in result.ideas)
         for claim in case.standalone_claims
+    )
+    concept_matches = {target.id: _matching_concepts(result, target) for target in case.concept_targets}
+    concept_hits = sum(bool(matches) for matches in concept_matches.values())
+    emitted_timestamps = 0
+    correct_timestamps = 0
+    expected_timestamps = sum(len(target.timestamps) for target in case.concept_targets)
+    for target in case.concept_targets:
+        for concept in concept_matches[target.id]:
+            emitted_timestamps += len(concept.timestamps)
+            correct_timestamps += len(set(concept.timestamps) & set(target.timestamps))
+    accepted_names = {normalize_quality_text(alias) for target in case.concept_targets for alias in target.aliases}
+    accepted_concepts = sum(normalize_quality_text(concept.name) in accepted_names for concept in result.concepts)
+    compound_targets = [target for target in case.concept_targets if target.compound]
+    compound_hits = sum(
+        any(set(concept.timestamps) & set(target.timestamps) for concept in concept_matches[target.id])
+        for target in compound_targets
     )
     noise_violations = sum(
         _alias_occurrences(_scope_text(result, rule.scope), rule.aliases) > rule.max_occurrences
@@ -342,13 +433,19 @@ def evaluate_quality_case(case: QualityCase, result: AnalysisResult | None = Non
     metrics = QualityMetrics(
         topic_coverage=round(_ratio(topic_hits, len(case.topics)), 6),
         standalone_claim_coverage=round(_ratio(claim_hits, len(case.standalone_claims)), 6),
+        concept_coverage=round(_ratio(concept_hits, len(case.concept_targets)), 6),
+        compound_concept_coverage=round(_ratio(compound_hits, len(compound_targets)), 6),
+        concept_timestamp_accuracy=round(_ratio(correct_timestamps, emitted_timestamps), 6),
+        concept_timestamp_recall=round(_ratio(correct_timestamps, expected_timestamps), 6),
+        concept_precision=round(_ratio(accepted_concepts, len(result.concepts)), 6),
+        concept_redundancy_rate=round(_concept_redundancy_rate(result), 6),
         noise_rule_violation_rate=round(_ratio(noise_violations, len(case.noise_rules)), 6),
         summary_duplicate_rate=round(_duplicate_rate(result.ideas), 6),
         useful_question_precision=round(precision, 6),
         useful_question_recall=round(recall, 6),
         useful_question_f1=round(f1, 6),
     )
-    return QualityCaseReport(case.id, case.profile, metrics, len(result.ideas), len(questions))
+    return QualityCaseReport(case.id, case.profile, metrics, len(result.ideas), len(questions), len(result.concepts))
 
 
 def evaluate_quality_corpus(corpus: QualityCorpus) -> QualityReport:

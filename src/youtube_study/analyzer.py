@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from collections import Counter
 
+from .concepts import extract_concepts
 from .study_models import ANALYSIS_FORMAT_VERSION as _ANALYSIS_FORMAT_VERSION
 from .study_models import (
     AnalysisResult,
@@ -30,6 +31,7 @@ STOPWORDS = set(
     un una unas unos y ya yo bien entonces ejemplo ahora ver voy vos qué cómo cosa cosas hacer ahí acá
     directamente caso gente tener tiene tengo está estoy estás estamos están vas vamos puedo podés podes
     puede pueden podría verdad realmente mostrar miren vean después acá abajo arriba también qr sim
+    hoy primero solo sólo según varias dónde
     """.split()
 )
 
@@ -291,25 +293,13 @@ def section_summaries(
     return sections
 
 
-def concept_mentions(cues: list[Cue], limit: int = 20, text: str | None = None) -> list[ConceptMention]:
-    text = full_text(cues) if text is None else text
-    top = keywords(text, limit)
-    concepts: list[ConceptMention] = []
-    for word, count in top:
-        timestamps: list[str] = []
-        pattern = re.compile(r"(?<![\w.-])" + re.escape(word) + r"(?![\w.-])", re.IGNORECASE)
-        for cue in cues:
-            if pattern.search(cue.text):
-                timestamps.append(cue.start)
-            if len(timestamps) >= 5:
-                break
-        score = count + min(len(timestamps), 5) * 2
-        concepts.append(ConceptMention(word, score, count, timestamps))
-    return sorted(concepts, key=lambda item: item.score, reverse=True)
+def concept_mentions(cues: list[Cue], limit: int = 15, units: list[TextUnit] | None = None) -> list[ConceptMention]:
+    units = informative_units(cues) if units is None else units
+    return extract_concepts(units, STOPWORDS, limit)
 
 
 def source_excerpt_for_term(cues: list[Cue], term: str, units: list[TextUnit] | None = None) -> SourceExcerpt | None:
-    pattern = re.compile(r"(?<![\w.-])" + re.escape(term) + r"(?![\w.-])", re.IGNORECASE)
+    pattern = re.compile(r"(?<![\w.-])" + re.escape(term) + r"(?!\w|-(?=\w)|\.(?=\w))", re.IGNORECASE)
     units = informative_units(cues) if units is None else units
     matches = [unit for unit in units if pattern.search(unit.text)]
     if not matches:
@@ -322,8 +312,8 @@ def source_excerpt_for_term(cues: list[Cue], term: str, units: list[TextUnit] | 
         enumerate(matches),
         key=lambda item: (
             bool(explanation.search(item[1].text)),
-            len(content_tokens(item[1].text)),
             -item[0],
+            len(content_tokens(item[1].text)),
         ),
     )[1]
     return selected.evidence
@@ -390,7 +380,11 @@ def questions(
             add("basicas", f"¿Qué se explica sobre {tool.name}?", evidence)
             used_topics.add(tool.name.lower())
 
-    for concept in concepts:
+    question_concepts = sorted(
+        concepts,
+        key=lambda concept: (" " in concept.name, -(concept.count + min(len(concept.timestamps), 5) * 2)),
+    )
+    for concept in question_concepts:
         if len(groups["basicas"]) >= 4:
             break
         if concept.name in used_topics or concept.name in QUESTION_TOPIC_EXCLUSIONS:
@@ -444,7 +438,7 @@ def analyze_cues(cues: list[Cue]) -> AnalysisResult:
     text = " ".join(unit.text for unit in units)
     tools = detect_tools(text)
     ideas = important_ideas(cues, units=units)
-    concepts = concept_mentions(cues, text=text)
+    concepts = concept_mentions(cues, units=units)
     qs = questions(cues, tools, concepts, ideas, units=units)
     return AnalysisResult(
         cues=cues,

@@ -79,8 +79,19 @@ def test_generate_study_files_writes_all_artifacts_from_one_analysis(tmp_path: P
     tailscale = next(tool for tool in tools if tool["name"] == "tailscale")
     assert tailscale["category"] == "service"
     assert tailscale["kind"] == "known"
-    assert concepts and {"name", "score", "count", "timestamps"}.issubset(concepts[0])
-    assert info["analysis"]["format_version"] == 2
+    assert concepts and {
+        "name",
+        "score",
+        "count",
+        "frequency_score",
+        "distribution_score",
+        "association_score",
+        "timestamps",
+    }.issubset(concepts[0])
+    assert info["analysis"]["format_version"] == 3
+    concept_markdown = (video_dir / "concepts.md").read_text(encoding="utf-8")
+    assert all(f"## {concept['name']}" in concept_markdown for concept in concepts)
+    assert all(f"### {concept['name']}" in study for concept in concepts)
     assert "# Estudio consolidado: Demo Ñ" in study
     assert "### tailscale" in study
     reference = "https://www.youtube.com/watch?v=demo&t=1"
@@ -94,7 +105,8 @@ def test_generate_study_files_writes_all_artifacts_from_one_analysis(tmp_path: P
     assert subtitle_path.read_bytes() == subtitle_bytes
 
 
-def test_analyze_existing_migrates_v1_artifacts_to_v2_without_network(tmp_path: Path) -> None:
+@pytest.mark.parametrize("legacy_version", [1, 2])
+def test_analyze_existing_migrates_old_artifacts_to_v3_without_network(legacy_version: int, tmp_path: Path) -> None:
     video_dir = tmp_path / "videos" / "legacy"
     video_dir.mkdir(parents=True)
     subtitle_path = video_dir / "legacy.es.vtt"
@@ -106,7 +118,7 @@ def test_analyze_existing_migrates_v1_artifacts_to_v2_without_network(tmp_path: 
                 "title": "Análisis antiguo",
                 "webpage_url": "https://youtu.be/legacy",
                 "source_subtitle": str(subtitle_path),
-                "analysis": {"format_version": 1},
+                "analysis": {"format_version": legacy_version},
             }
         ),
         encoding="utf-8",
@@ -119,7 +131,7 @@ def test_analyze_existing_migrates_v1_artifacts_to_v2_without_network(tmp_path: 
 
     info = json.loads((analyzed_dir / "info.json").read_text(encoding="utf-8"))
     flashcards = (analyzed_dir / "flashcards.md").read_text(encoding="utf-8")
-    assert info["analysis"]["format_version"] == 2
+    assert info["analysis"]["format_version"] == 3
     assert "Respóndelo usando" not in flashcards
     assert "https://youtu.be/legacy?t=1" in flashcards
 

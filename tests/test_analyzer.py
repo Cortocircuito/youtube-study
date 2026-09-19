@@ -10,6 +10,7 @@ from src.youtube_study.analyzer import (
     informative_units,
     is_obvious_noise,
     selectable_units,
+    source_excerpt_for_term,
     token_similarity,
 )
 from src.youtube_study.transcript import Cue
@@ -47,6 +48,101 @@ def test_concepts_exclude_fillers_and_false_positives() -> None:
 
     assert {"ssh", "tailscale", "tmux", "claude"}.issubset(names)
     assert names.isdisjoint({"entonces", "ahora", "gente", "cosas", "sim"})
+
+
+def test_concepts_include_compound_terms_with_exact_timestamps() -> None:
+    cues = [
+        Cue("00:00:01", "Antes de optimizar una base de datos conviene medir consultas lentas."),
+        Cue("00:00:10", "El plan de ejecución muestra el coste de cada operación."),
+        Cue("00:00:20", "Una copia de seguridad debe probarse mediante una restauración."),
+    ]
+
+    concepts = {concept.name: concept for concept in concept_mentions(cues)}
+
+    assert concepts["base de datos"].timestamps == ("00:00:01",)
+    assert concepts["plan de ejecución"].association_score is not None
+    assert concepts["copia de seguridad"].timestamps == ("00:00:20",)
+    assert concepts["restauración"].timestamps == ("00:00:20",)
+
+
+def test_concepts_do_not_cross_sentence_boundaries_or_promote_generic_actions() -> None:
+    cues = [Cue("00:00:01", "Una clave robusta protege el acceso. Una copia segura conserva los datos.")]
+
+    names = {concept.name for concept in concept_mentions(cues, limit=50)}
+
+    assert "clave robusta" in names
+    assert "robusta protege" not in names
+    assert "acceso una" not in names
+    assert names.isdisjoint({"protege", "datos"})
+
+
+def test_concept_distribution_rewards_mentions_spread_over_time() -> None:
+    cues = [
+        Cue("00:00:01", "Cifrado protege archivos e índice acelera consultas."),
+        Cue("00:00:05", "Índice mejora lecturas repetidas."),
+        Cue("00:10:00", "Cifrado limita el acceso no autorizado."),
+    ]
+
+    concepts = {concept.name: concept for concept in concept_mentions(cues, limit=50)}
+
+    assert concepts["cifrado"].count == concepts["índice"].count == 2
+    assert concepts["cifrado"].distribution_score > concepts["índice"].distribution_score
+
+
+def test_concept_deduplication_uses_occurrence_spans() -> None:
+    cues = [
+        Cue("00:00:01", "Una clave robusta y una clave temporal protegen accesos distintos."),
+        Cue("00:00:10", "Índice índice no debe convertirse en un concepto repetido."),
+    ]
+
+    names = {concept.name for concept in concept_mentions(cues, limit=50)}
+
+    assert "clave" in names
+    assert "clave robusta" in names
+    assert "clave temporal" in names
+    assert "índice índice" not in names
+
+
+def test_concept_spans_distinguish_sentences_from_the_same_cue() -> None:
+    cue = Cue(
+        "00:00:01",
+        "Una clave robusta protege el servicio. Una clave temporal permite completar la migración.",
+    )
+
+    names = {concept.name for concept in concept_mentions([cue], limit=50)}
+
+    assert {"clave", "clave robusta", "clave temporal"} <= names
+
+
+def test_concept_evidence_does_not_match_inside_hyphenated_tokens() -> None:
+    cues = [
+        Cue("00:00:01", "Prefijo-node.js aparece como un token diferente."),
+        Cue("00:00:10", "Node.js permite ejecutar JavaScript fuera del navegador."),
+    ]
+
+    evidence = source_excerpt_for_term(cues, "node.js")
+
+    assert evidence is not None
+    assert evidence.timestamp == "00:00:10"
+
+
+def test_compound_concepts_do_not_cross_dash_separators() -> None:
+    names = {
+        concept.name for concept in concept_mentions([Cue("00:00:01", "Node.js - servidor remoto estable.")], limit=50)
+    }
+
+    assert "node.js servidor" not in names
+
+
+def test_single_sentence_does_not_fill_the_limit_with_incidental_bigrams() -> None:
+    concepts = concept_mentions(
+        [Cue("00:00:01", "La plataforma escalable integra servicios externos mediante conectores seguros.")]
+    )
+    names = {concept.name for concept in concepts}
+
+    assert "plataforma escalable" in names
+    assert names.isdisjoint({"escalable integra", "integra servicios", "servicios externos"})
+    assert len(concepts) < 15
 
 
 def test_tool_flashcards_keep_classification_and_transcript_source() -> None:
@@ -150,7 +246,7 @@ def test_repeated_informative_mentions_keep_analysis_counts() -> None:
     assert len(selectable_units(cues)) == 1
     assert ssh_tool.count == 2
     assert ssh_concept.count == 2
-    assert ssh_concept.timestamps == ["00:00:01", "00:00:05"]
+    assert ssh_concept.timestamps == ("00:00:01", "00:00:05")
 
 
 def test_fillers_are_penalized_without_rewriting_evidence() -> None:

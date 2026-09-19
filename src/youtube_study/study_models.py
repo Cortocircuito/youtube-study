@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from .transcript import Cue
 
-ANALYSIS_FORMAT_VERSION = 2
+ANALYSIS_FORMAT_VERSION = 3
 
 
 @dataclass(frozen=True)
@@ -70,12 +70,31 @@ class ToolMention:
     kind: str = "known"
 
 
-@dataclass
+@dataclass(frozen=True)
 class ConceptMention:
     name: str
-    score: int
+    score: float
     count: int
-    timestamps: list[str]
+    frequency_score: float
+    distribution_score: float
+    association_score: float | None
+    timestamps: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if not self.name.strip():
+            raise ValueError("El concepto necesita un nombre")
+        if self.count <= 0:
+            raise ValueError("El concepto necesita al menos una mención")
+        scores = (self.score, self.frequency_score, self.distribution_score)
+        if any(not 0.0 <= score <= 1.0 for score in scores):
+            raise ValueError("Las puntuaciones del concepto deben estar entre 0 y 1")
+        compound = " " in self.name.strip()
+        if compound != (self.association_score is not None):
+            raise ValueError("Sólo los conceptos compuestos necesitan puntuación de asociación")
+        if self.association_score is not None and not 0.0 <= self.association_score <= 1.0:
+            raise ValueError("La asociación del concepto debe estar entre 0 y 1")
+        if not self.timestamps or len(self.timestamps) != len(set(self.timestamps)):
+            raise ValueError("Los timestamps del concepto deben ser únicos y no vacíos")
 
 
 @dataclass(frozen=True)

@@ -71,7 +71,7 @@ def _render_study_files(
     write_summary(output_dir / "summary.md", title, result.keywords, result.ideas, result.sections, source_url)
     write_tools(output_dir / "tools.md", result.tools)
     write_tools_json(output_dir / "tools.json", result.tools)
-    write_concepts(output_dir / "concepts.md", result.sections)
+    write_concepts(output_dir / "concepts.md", result.concepts, source_url)
     write_concepts_json(output_dir / "concepts.json", result.concepts)
     write_questions(output_dir / "questions.md", result.questions, source_url)
     write_flashcards(output_dir / "flashcards.md", result.cards, source_url)

@@ -9,7 +9,7 @@ La aplicación funciona localmente sin Ollama y permite:
 - Crear resúmenes extractivos deduplicados, conceptos, preguntas respondidas y flashcards.
 - Referenciar el instante del video desde Markdown y Anki.
 - Mantener `data/library.json` y usar `list`, `show`, `search`, `analyze`, `export` y `rebuild-library`.
-- Regenerar análisis antiguos al formato v2 sin red cuando los subtítulos ya están guardados.
+- Regenerar análisis antiguos al formato v3 sin red cuando los subtítulos ya están guardados.
 - Propagar evidencia extractiva con posiciones y rangos exactos desde los captions hasta preguntas y tarjetas.
 - Publicar generaciones y exportaciones desde staging mediante reemplazos atómicos por archivo y reintento explícito.
 - Leer la biblioteca sin efectos secundarios y reconstruir índices dañados explícitamente con respaldo mediante `rebuild-library`.
@@ -27,6 +27,8 @@ La aplicación funciona localmente sin Ollama y permite:
 La fase inicial de evaluación ya dispone de objetivos manuales sobre fixtures sanitizados, métricas direccionales y una muestra local de videos largos pendiente de anotación humana. Esta muestra no participa en CI ni convierte resultados generados en referencias de calidad.
 
 La segunda fase reconstruye unidades legibles desde cues fragmentados, conserva evidencia exacta y filtra ruido inequívoco sólo en el material de estudio. El caso ruidoso del corpus ya no presenta violaciones; quedan pendientes los temas genéricos de preguntas y la anotación manual de videos largos.
+
+La tercera fase extrae conceptos de una a tres palabras, puntúa frecuencia, distribución y asociación, elimina variantes redundantes y alinea `concepts.md`, `concepts.json` y la sección correspondiente de `study.md`. El formato de análisis v3 permite regenerar estos artefactos desde subtítulos locales.
 
 ## Posibles mejoras posteriores
 

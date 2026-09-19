@@ -1,0 +1,107 @@
+{
+  "metric_version": 2,
+  "corpus_schema_version": 2,
+  "corpus_digest": "da3b8324662a231c5f5bb0a9962241df854811f138ed2eba4671366ec2d033ec",
+  "analysis_format_version": 3,
+  "cases": {
+    "gardening": {
+      "profile": "explicación estructurada de horticultura",
+      "metrics": {
+        "topic_coverage": 1.0,
+        "standalone_claim_coverage": 1.0,
+        "concept_coverage": 1.0,
+        "compound_concept_coverage": 1.0,
+        "concept_timestamp_accuracy": 1.0,
+        "concept_timestamp_recall": 1.0,
+        "concept_precision": 1.0,
+        "concept_redundancy_rate": 0.0,
+        "noise_rule_violation_rate": 1.0,
+        "summary_duplicate_rate": 0.0,
+        "useful_question_precision": 0.3,
+        "useful_question_recall": 1.0,
+        "useful_question_f1": 0.461538
+      },
+      "idea_count": 3,
+      "question_count": 10,
+      "concept_count": 15
+    },
+    "databases": {
+      "profile": "explicación técnica de bases de datos",
+      "metrics": {
+        "topic_coverage": 1.0,
+        "standalone_claim_coverage": 1.0,
+        "concept_coverage": 1.0,
+        "compound_concept_coverage": 1.0,
+        "concept_timestamp_accuracy": 1.0,
+        "concept_timestamp_recall": 1.0,
+        "concept_precision": 0.933333,
+        "concept_redundancy_rate": 0.0,
+        "noise_rule_violation_rate": 1.0,
+        "summary_duplicate_rate": 0.0,
+        "useful_question_precision": 0.3,
+        "useful_question_recall": 1.0,
+        "useful_question_f1": 0.461538
+      },
+      "idea_count": 3,
+      "question_count": 10,
+      "concept_count": 15
+    },
+    "security": {
+      "profile": "explicación conceptual de seguridad",
+      "metrics": {
+        "topic_coverage": 1.0,
+        "standalone_claim_coverage": 1.0,
+        "concept_coverage": 1.0,
+        "compound_concept_coverage": 1.0,
+        "concept_timestamp_accuracy": 1.0,
+        "concept_timestamp_recall": 1.0,
+        "concept_precision": 0.933333,
+        "concept_redundancy_rate": 0.0,
+        "noise_rule_violation_rate": 1.0,
+        "summary_duplicate_rate": 0.0,
+        "useful_question_precision": 0.375,
+        "useful_question_recall": 1.0,
+        "useful_question_f1": 0.545455
+      },
+      "idea_count": 3,
+      "question_count": 8,
+      "concept_count": 15
+    },
+    "noisy_energy": {
+      "profile": "directo ruidoso sanitizado sobre eficiencia energética",
+      "metrics": {
+        "topic_coverage": 1.0,
+        "standalone_claim_coverage": 1.0,
+        "concept_coverage": 1.0,
+        "compound_concept_coverage": 1.0,
+        "concept_timestamp_accuracy": 1.0,
+        "concept_timestamp_recall": 1.0,
+        "concept_precision": 1.0,
+        "concept_redundancy_rate": 0.0,
+        "noise_rule_violation_rate": 0.0,
+        "summary_duplicate_rate": 0.0,
+        "useful_question_precision": 0.111111,
+        "useful_question_recall": 0.333333,
+        "useful_question_f1": 0.166667
+      },
+      "idea_count": 3,
+      "question_count": 9,
+      "concept_count": 15
+    }
+  },
+  "macro": {
+    "topic_coverage": 1.0,
+    "standalone_claim_coverage": 1.0,
+    "concept_coverage": 1.0,
+    "compound_concept_coverage": 1.0,
+    "concept_timestamp_accuracy": 1.0,
+    "concept_timestamp_recall": 1.0,
+    "concept_precision": 0.966666,
+    "concept_redundancy_rate": 0.0,
+    "noise_rule_violation_rate": 0.75,
+    "summary_duplicate_rate": 0.0,
+    "useful_question_precision": 0.271528,
+    "useful_question_recall": 0.833333,
+    "useful_question_f1": 0.408799
+  }
+}

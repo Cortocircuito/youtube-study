@@ -135,18 +135,46 @@ def write_tools_json(path: Path, tools: list[ToolMention]) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def write_concepts(path: Path, sections: list[tuple[str, str, list[str]]]) -> None:
-    lines = ["# Conceptos por sección", ""]
-    for time_range, topic, ideas in sections:
-        lines += [f"## {time_range}", "", f"**Palabras clave:** {topic or 'N/D'}", "", "**Ideas:**"]
-        lines += [f"- {idea}" for idea in ideas]
-        lines.append("")
+def concept_markdown_lines(
+    concepts: list[ConceptMention], source_url: str | None = None, *, heading_level: int = 2
+) -> list[str]:
+    if not concepts:
+        return ["No se detectaron conceptos relevantes.", ""]
+    heading = "#" * heading_level
+    lines: list[str] = []
+    for concept in concepts:
+        association = f"{concept.association_score:.6f}" if concept.association_score is not None else "N/D"
+        references = ", ".join(markdown_reference(timestamp, source_url) for timestamp in concept.timestamps)
+        lines += [
+            f"{heading} {concept.name}",
+            "",
+            f"- Puntuación: {concept.score:.6f}",
+            f"- Menciones: {concept.count}",
+            f"- Frecuencia: {concept.frequency_score:.6f}",
+            f"- Distribución: {concept.distribution_score:.6f}",
+            f"- Asociación: {association}",
+            f"- Referencias: {references}",
+            "",
+        ]
+    return lines
+
+
+def write_concepts(path: Path, concepts: list[ConceptMention], source_url: str | None = None) -> None:
+    lines = ["# Conceptos detectados", "", *concept_markdown_lines(concepts, source_url)]
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
 def write_concepts_json(path: Path, concepts: list[ConceptMention]) -> None:
     payload = [
-        {"name": concept.name, "score": concept.score, "count": concept.count, "timestamps": concept.timestamps}
+        {
+            "name": concept.name,
+            "score": concept.score,
+            "count": concept.count,
+            "frequency_score": concept.frequency_score,
+            "distribution_score": concept.distribution_score,
+            "association_score": concept.association_score,
+            "timestamps": concept.timestamps,
+        }
         for concept in concepts
     ]
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -232,10 +260,7 @@ def write_study_markdown_from_result(
         lines += ["No se detectaron herramientas conocidas.", ""]
 
     lines += ["## Conceptos", ""]
-    for time_range, topic, ideas in result.sections:
-        lines += [f"### {time_range}", "", f"**Palabras clave:** {topic or 'N/D'}", "", "**Ideas:**"]
-        lines += [f"- {idea}" for idea in ideas]
-        lines.append("")
+    lines += concept_markdown_lines(result.concepts, source_url, heading_level=3)
 
     lines += ["## Preguntas", ""]
     headings = {"basicas": "Básicas", "comprension": "Comprensión", "practicas": "Prácticas"}
@@ -308,7 +333,7 @@ def write_study_guide(
         "",
         "1. Lee primero `summary.md`.",
         "2. Revisa `tools.md` para identificar herramientas.",
-        "3. Lee `concepts.md` por bloques de tiempo.",
+        "3. Revisa en `concepts.md` los conceptos ordenados y sus referencias temporales.",
         "4. Contesta `questions.md` sin mirar la transcripción.",
         "5. Repasa con `flashcards.md`.",
         "",

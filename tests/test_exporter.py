@@ -9,6 +9,8 @@ from src.youtube_study.exporter import (
     markdown_reference,
     timestamp_url,
     write_anki_csv,
+    write_concepts,
+    write_concepts_json,
     write_study_markdown_from_result,
 )
 from src.youtube_study.study_models import Flashcard, SourceExcerpt, SourceFragment
@@ -71,8 +73,43 @@ def test_study_markdown_is_generated_from_structured_result(tmp_path: Path) -> N
     assert "## Herramientas" in content
     assert "### tailscale" in content
     assert "## Flashcards" in content
-    assert "_Formato de análisis: 2_" in content
+    assert "_Formato de análisis: 3_" in content
     assert "[00:00:01](https://youtu.be/demo?t=1)" in content
+
+
+def test_concept_exports_share_order_scores_and_references(tmp_path: Path) -> None:
+    result = analyze_cues(
+        [
+            Cue("00:00:01", "Una base de datos organiza registros relacionados."),
+            Cue("00:00:10", "Una copia de seguridad permite recuperar los registros."),
+        ]
+    )
+    markdown_path = tmp_path / "concepts.md"
+    json_path = tmp_path / "concepts.json"
+    study_path = tmp_path / "study.md"
+
+    write_concepts(markdown_path, result.concepts, "https://youtu.be/demo")
+    write_concepts_json(json_path, result.concepts)
+    write_study_markdown_from_result(study_path, "Demo", result, "https://youtu.be/demo")
+
+    markdown = markdown_path.read_text(encoding="utf-8")
+    study = study_path.read_text(encoding="utf-8")
+    payload = json.loads(json_path.read_text(encoding="utf-8"))
+    assert [item["name"] for item in payload] == [concept.name for concept in result.concepts]
+    assert {
+        "name",
+        "score",
+        "count",
+        "frequency_score",
+        "distribution_score",
+        "association_score",
+        "timestamps",
+    } <= payload[0].keys()
+    for concept in result.concepts:
+        assert markdown.index(f"## {concept.name}") < len(markdown)
+        assert study.index(f"### {concept.name}") < len(study)
+    assert "https://youtu.be/demo?t=1" in markdown
+    assert "- Asociación: N/D" in markdown
 
 
 def test_info_written_by_pipeline_contains_analysis_metadata(tmp_path: Path) -> None:
