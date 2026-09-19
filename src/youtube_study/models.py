@@ -1,20 +1,33 @@
 from __future__ import annotations
 
-from typing import Any, TypedDict
+from dataclasses import dataclass
+from typing import Any, TypeAlias, TypedDict
+
+YtDlpInfo: TypeAlias = dict[str, Any]
+SourceSubtitleData: TypeAlias = str | dict[str, Any]
 
 
-class VideoInfo(TypedDict, total=False):
-    """Metadata received from yt-dlp or persisted in a video's info.json."""
+@dataclass(frozen=True)
+class VideoMetadata:
+    """Normalized video metadata used by the application core."""
 
     id: str
     title: str
-    uploader: str
-    duration: int | float
-    webpage_url: str
-    subtitles: dict[str, list[dict[str, Any]]]
-    automatic_captions: dict[str, list[dict[str, Any]]]
-    source_subtitle: str | dict[str, Any]
-    analysis: dict[str, Any]
+    uploader: str | None = None
+    duration: int | float | None = None
+    webpage_url: str | None = None
+
+
+@dataclass(frozen=True)
+class PersistedVideoInfo:
+    """Validated contents needed from one video's info.json."""
+
+    metadata: VideoMetadata
+    source_subtitle: SourceSubtitleData | None = None
+    analysis_format_version: int | None = None
+
+    def subtitle_selection_info(self) -> dict[str, Any]:
+        return {"source_subtitle": self.source_subtitle} if self.source_subtitle is not None else {}
 
 
 class LibraryEntry(TypedDict, total=False):

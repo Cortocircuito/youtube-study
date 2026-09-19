@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+from .models import VideoMetadata
 from .study_models import (
     ANALYSIS_FORMAT_VERSION,
     AnalysisResult,
@@ -73,13 +74,15 @@ def _analysis_payload(format_version: int = ANALYSIS_FORMAT_VERSION) -> dict[str
     }
 
 
-def write_info(path: Path, info: dict, subtitle: Any, *, analysis_version: int = ANALYSIS_FORMAT_VERSION) -> None:
+def write_info(
+    path: Path, metadata: VideoMetadata, subtitle: Any, *, analysis_version: int = ANALYSIS_FORMAT_VERSION
+) -> None:
     payload = {
-        "id": info.get("id"),
-        "title": info.get("title"),
-        "uploader": info.get("uploader"),
-        "duration": info.get("duration"),
-        "webpage_url": info.get("webpage_url"),
+        "id": metadata.id,
+        "title": metadata.title,
+        "uploader": metadata.uploader,
+        "duration": metadata.duration,
+        "webpage_url": metadata.webpage_url,
         "source_subtitle": _source_subtitle_payload(subtitle),
         "analysis": _analysis_payload(analysis_version),
     }

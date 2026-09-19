@@ -11,7 +11,8 @@ from pathlib import Path
 from typing import Any
 
 from .errors import AppError
-from .models import LibraryEntry, VideoInfo
+from .metadata import load_persisted_video
+from .models import LibraryEntry, VideoMetadata
 from .study_models import ToolMention
 
 
@@ -65,18 +66,82 @@ def _recover_invalid_library(path: Path, reason: str) -> dict[str, list[dict[str
 
 def load_library(path: Path) -> dict[str, Any]:
     """Load local library, preserving a backup and recovering from invalid JSON."""
-    if not path.exists() or path.stat().st_size == 0:
-        return _empty_library()
     try:
+        if not path.exists() or path.stat().st_size == 0:
+            return _empty_library()
         with path.open("r", encoding="utf-8") as file:
             data = json.load(file)
-    except (OSError, json.JSONDecodeError):
+    except (json.JSONDecodeError, UnicodeDecodeError):
         return _recover_invalid_library(path, "La biblioteca estaba dañada.")
+    except OSError as exc:
+        raise LibraryError(f"No se pudo leer la biblioteca: {path}") from exc
 
     videos = data.get("videos") if isinstance(data, dict) else None
-    if not isinstance(videos, list) or not all(isinstance(video, dict) for video in videos):
+    if not isinstance(videos, list):
         return _recover_invalid_library(path, "La estructura de la biblioteca era inválida.")
-    return data
+
+    valid_videos: list[LibraryEntry] = []
+    invalid_entries: list[str] = []
+    for index, video in enumerate(videos):
+        try:
+            valid_videos.append(_validate_library_entry(video, index))
+        except LibraryError as exc:
+            invalid_entries.append(str(exc))
+    if invalid_entries:
+        recovered = {**data, "videos": valid_videos}
+        try:
+            backup = _backup_invalid_library(path)
+        except OSError as exc:
+            raise LibraryError(f"No se pudo respaldar la biblioteca inválida: {path}") from exc
+        save_library(path, recovered)
+        warnings.warn(
+            f"Se omitieron {len(invalid_entries)} entradas inválidas de la biblioteca. Respaldo: {backup}",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return recovered
+    return {**data, "videos": valid_videos}
+
+
+def _validate_library_entry(value: Any, index: int) -> LibraryEntry:
+    source = f"Entrada {index + 1} de la biblioteca"
+    if not isinstance(value, dict):
+        raise LibraryError(f"{source}: debe ser un objeto")
+
+    video_id = value.get("id")
+    if not isinstance(video_id, str) or not video_id:
+        raise LibraryError(f"{source}: 'id' debe ser texto no vacío")
+    path = value.get("path")
+    if not isinstance(path, str) or not path:
+        raise LibraryError(f"{source}: 'path' debe ser texto no vacío")
+
+    title = value.get("title", video_id)
+    if not isinstance(title, str) or not title:
+        raise LibraryError(f"{source}: 'title' debe ser texto no vacío")
+    for field in ("channel", "url"):
+        if value.get(field) is not None and not isinstance(value[field], str):
+            raise LibraryError(f"{source}: '{field}' debe ser texto o null")
+    duration = value.get("duration")
+    if duration is not None and (isinstance(duration, bool) or not isinstance(duration, (int, float)) or duration < 0):
+        raise LibraryError(f"{source}: 'duration' debe ser un número no negativo o null")
+    tools = value.get("tools", [])
+    if not isinstance(tools, list) or any(not isinstance(tool, str) or not tool for tool in tools):
+        raise LibraryError(f"{source}: 'tools' debe ser una lista de textos no vacíos")
+    for field in ("created_at", "updated_at"):
+        if field in value and (not isinstance(value[field], str) or not value[field]):
+            raise LibraryError(f"{source}: '{field}' debe ser texto no vacío")
+
+    return {
+        "id": video_id,
+        "title": title,
+        "channel": value.get("channel"),
+        "duration": duration,
+        "url": value.get("url"),
+        "path": path,
+        "tools": list(tools),
+        "created_at": value.get("created_at", ""),
+        "updated_at": value.get("updated_at", ""),
+    }
 
 
 def save_library(path: Path, data: dict[str, Any]) -> None:
@@ -132,22 +197,19 @@ def get_video(path: Path, video_id: str) -> LibraryEntry | None:
 
 
 def _video_entry(
-    info: VideoInfo,
+    metadata: VideoMetadata,
     video_dir: Path,
     library_path: Path,
     tools: list[str],
     created_at: str,
     updated_at: str,
 ) -> LibraryEntry:
-    video_id = info.get("id")
-    if not video_id:
-        raise LibraryError("No se puede registrar video sin id")
     return {
-        "id": video_id,
-        "title": info.get("title") or video_id,
-        "channel": info.get("uploader"),
-        "duration": info.get("duration"),
-        "url": info.get("webpage_url"),
+        "id": metadata.id,
+        "title": metadata.title,
+        "channel": metadata.uploader,
+        "duration": metadata.duration,
+        "url": metadata.webpage_url,
         "path": _relative_video_path(library_path, video_dir),
         "tools": tools,
         "created_at": created_at,
@@ -155,17 +217,15 @@ def _video_entry(
     }
 
 
-def upsert_video(path: Path, info: VideoInfo, video_dir: Path, tools: list[ToolMention]) -> LibraryEntry:
+def upsert_video(path: Path, metadata: VideoMetadata, video_dir: Path, tools: list[ToolMention]) -> LibraryEntry:
     """Insert or update one video in the local library, deduplicated by id."""
     data = load_library(path)
     now = utc_now()
-    video_id = info.get("id")
-    if not video_id:
-        raise LibraryError("No se puede registrar video sin id")
+    video_id = metadata.id
 
     existing = next((item for item in data["videos"] if item.get("id") == video_id), None)
     entry = _video_entry(
-        info,
+        metadata,
         video_dir,
         path,
         [tool.name for tool in tools],
@@ -180,6 +240,29 @@ def upsert_video(path: Path, info: VideoInfo, video_dir: Path, tools: list[ToolM
     data["videos"].sort(key=lambda item: item.get("updated_at") or "", reverse=True)
     save_library(path, data)
     return entry
+
+
+def _tool_names_from_artifact(path: Path, fallback: list[str]) -> list[str]:
+    if not path.exists():
+        return fallback
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except OSError:
+        warnings.warn(
+            f"No se pudo reconstruir herramientas desde {path}; se conserva el índice previo.", RuntimeWarning
+        )
+        return fallback
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        warnings.warn(
+            f"El archivo de herramientas contiene JSON inválido: {path}; se conserva el índice previo.", RuntimeWarning
+        )
+        return fallback
+    if not isinstance(payload, list) or any(
+        not isinstance(tool, dict) or not isinstance(tool.get("name"), str) or not tool["name"] for tool in payload
+    ):
+        warnings.warn(f"El archivo de herramientas es inválido: {path}; se conserva el índice previo.", RuntimeWarning)
+        return fallback
+    return list(dict.fromkeys(tool["name"] for tool in payload))
 
 
 def rebuild_library(path: Path, videos_dir: Path) -> RebuildResult:
@@ -198,27 +281,21 @@ def rebuild_library(path: Path, videos_dir: Path) -> RebuildResult:
             skipped.append(f"{video_dir.name}: falta info.json")
             continue
         try:
-            info = json.loads(info_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            skipped.append(f"{video_dir.name}: info.json inválido")
-            continue
-        if not isinstance(info, dict):
-            skipped.append(f"{video_dir.name}: info.json debe contener un objeto JSON")
-            continue
-        info.setdefault("id", video_dir.name)
-        previous_entry = previous.get(str(info["id"]), {})
-        try:
+            persisted = load_persisted_video(info_path, video_dir.name)
+            metadata = persisted.metadata
+            previous_entry = previous.get(metadata.id, {})
+            previous_tools = list(previous_entry.get("tools") or [])
             videos.append(
                 _video_entry(
-                    info,
+                    metadata,
                     video_dir,
                     path,
-                    list(previous_entry.get("tools") or []),
+                    _tool_names_from_artifact(video_dir / "tools.json", previous_tools),
                     previous_entry.get("created_at") or now,
                     now,
                 )
             )
-        except LibraryError as exc:
+        except AppError as exc:
             skipped.append(f"{video_dir.name}: {exc}")
 
     videos.sort(key=lambda item: item.get("updated_at") or "", reverse=True)

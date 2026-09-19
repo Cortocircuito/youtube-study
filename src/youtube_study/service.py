@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from .analyzer import analyze_cues
@@ -24,7 +23,8 @@ from .exporter import (
     write_transcript_paragraphs,
 )
 from .library import library_path_from_videos_dir, upsert_video
-from .models import VideoInfo
+from .metadata import load_persisted_video, metadata_from_ytdlp
+from .models import VideoMetadata
 from .study_models import AnalysisResult
 from .transcript import clean_vtt
 
@@ -57,12 +57,14 @@ def _analyze_subtitle(subtitle: SubtitleSelection) -> AnalysisResult:
     return result
 
 
-def _render_study_files(info: VideoInfo, output_dir: Path, subtitle: SubtitleSelection, result: AnalysisResult) -> None:
-    video_id = info["id"]
-    title = info.get("title", video_id)
-    source_url = info.get("webpage_url")
+def _render_study_files(
+    metadata: VideoMetadata, output_dir: Path, subtitle: SubtitleSelection, result: AnalysisResult
+) -> None:
+    video_id = metadata.id
+    title = metadata.title
+    source_url = metadata.webpage_url
 
-    write_info(output_dir / "info.json", info, subtitle, analysis_version=result.format_version)
+    write_info(output_dir / "info.json", metadata, subtitle, analysis_version=result.format_version)
     write_transcript(output_dir / "transcript.txt", result.cues)
     write_clean_transcript(output_dir / "transcript.clean.txt", result.cues)
     write_transcript_paragraphs(output_dir / "transcript.paragraphs.md", result.cues)
@@ -75,34 +77,32 @@ def _render_study_files(info: VideoInfo, output_dir: Path, subtitle: SubtitleSel
     write_flashcards(output_dir / "flashcards.md", result.cards, source_url)
     write_study_guide(output_dir / "study-guide.md", title, result.tools, result.questions)
     write_study_markdown_from_result(output_dir / "study.md", title, result, source_url)
-    write_anki_csv(output_dir / "anki.csv", result.cards, video_id, info.get("uploader"), source_url)
+    write_anki_csv(output_dir / "anki.csv", result.cards, video_id, metadata.uploader, source_url)
 
 
-def generate_study_files(info: VideoInfo, video_dir: Path, subtitle: SubtitleSelection, library_path: Path) -> Path:
-    video_id = info.get("id")
-    if not video_id:
-        raise VideoDataError("No se puede analizar un video sin id.")
+def generate_study_files(
+    metadata: VideoMetadata, video_dir: Path, subtitle: SubtitleSelection, library_path: Path
+) -> Path:
     recover_pending_publication(video_dir)
     result = _analyze_subtitle(subtitle)
     with staging_directory(video_dir) as staging_dir:
-        _render_study_files(info, staging_dir, subtitle, result)
+        _render_study_files(metadata, staging_dir, subtitle, result)
         publish_artifacts(staging_dir, video_dir, GENERATED_ARTIFACTS)
 
-    upsert_video(library_path, info, video_dir, result.tools)
+    upsert_video(library_path, metadata, video_dir, result.tools)
     return video_dir
 
 
 def process_video(url: str, out: Path, languages: str, *, force_download: bool = False, quiet: bool = False) -> Path:
-    info: VideoInfo = download_subtitles(url, out, languages, force_download=force_download, quiet=quiet)
-    video_id = info.get("id")
-    if not video_id:
-        raise VideoDataError("YouTube no devolvió un id para el video solicitado.")
+    info = download_subtitles(url, out, languages, force_download=force_download, quiet=quiet)
+    metadata = metadata_from_ytdlp(info)
+    video_id = metadata.id
     video_dir = out / video_id
     subtitle = choose_subtitle(video_dir, video_id, requested_languages(languages), info=info)
-    return generate_study_files(info, video_dir, subtitle, library_path_from_videos_dir(out))
+    return generate_study_files(metadata, video_dir, subtitle, library_path_from_videos_dir(out))
 
 
-def load_existing_video(video_id: str, out: Path, languages: str) -> tuple[VideoInfo, Path, SubtitleSelection]:
+def load_existing_video(video_id: str, out: Path, languages: str) -> tuple[VideoMetadata, Path, SubtitleSelection]:
     video_dir = out / video_id
     if not video_dir.exists():
         raise VideoDataError(f"No existe el directorio del video: {video_dir}")
@@ -110,34 +110,33 @@ def load_existing_video(video_id: str, out: Path, languages: str) -> tuple[Video
     info_path = video_dir / "info.json"
     if not info_path.exists():
         raise VideoDataError(f"No existe info.json para {video_id}: {info_path}")
-    try:
-        info = json.loads(info_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise VideoDataError(f"info.json inválido para {video_id}: {info_path}") from exc
-    if not isinstance(info, dict):
-        raise VideoDataError(f"info.json inválido para {video_id}: se esperaba un objeto JSON")
-    info.setdefault("id", video_id)
-    subtitle = choose_subtitle(video_dir, video_id, requested_languages(languages), info=info)
-    return info, video_dir, subtitle
+    persisted = load_persisted_video(info_path, video_id)
+    subtitle = choose_subtitle(
+        video_dir,
+        video_id,
+        requested_languages(languages),
+        info=persisted.subtitle_selection_info(),
+    )
+    return persisted.metadata, video_dir, subtitle
 
 
 def analyze_existing(video_id: str, out: Path, languages: str) -> Path:
-    info, video_dir, subtitle = load_existing_video(video_id, out, languages)
-    return generate_study_files(info, video_dir, subtitle, library_path_from_videos_dir(out))
+    metadata, video_dir, subtitle = load_existing_video(video_id, out, languages)
+    return generate_study_files(metadata, video_dir, subtitle, library_path_from_videos_dir(out))
 
 
 def export_study(video_id: str, out: Path, languages: str, export_format: str) -> list[Path]:
-    info, video_dir, subtitle = load_existing_video(video_id, out, languages)
+    metadata, video_dir, subtitle = load_existing_video(video_id, out, languages)
     result = _analyze_subtitle(subtitle)
-    title = info.get("title", video_id)
-    source_url = info.get("webpage_url")
+    title = metadata.title
+    source_url = metadata.webpage_url
     names: list[str] = []
     with staging_directory(video_dir) as staging_dir:
         if export_format in {"markdown", "all"}:
             write_study_markdown_from_result(staging_dir / "study.md", title, result, source_url)
             names.append("study.md")
         if export_format in {"anki", "all"}:
-            write_anki_csv(staging_dir / "anki.csv", result.cards, video_id, info.get("uploader"), source_url)
+            write_anki_csv(staging_dir / "anki.csv", result.cards, video_id, metadata.uploader, source_url)
             names.append("anki.csv")
         if names:
             publish_artifacts(staging_dir, video_dir, names)

@@ -3,8 +3,17 @@ import tempfile
 import unittest
 import warnings
 from pathlib import Path
+from unittest.mock import patch
 
-from src.youtube_study.library import get_video, load_library, rebuild_library, resolve_video_path, upsert_video
+from src.youtube_study.library import (
+    LibraryError,
+    get_video,
+    load_library,
+    rebuild_library,
+    resolve_video_path,
+    upsert_video,
+)
+from src.youtube_study.models import VideoMetadata
 from src.youtube_study.study_models import ToolMention
 
 
@@ -14,17 +23,23 @@ class LibraryTests(unittest.TestCase):
             root = Path(temp)
             library_path = root / "library.json"
             video_dir = root / "video-1"
-            info = {
-                "id": "video-1",
-                "title": "Primero",
-                "uploader": "Canal",
-                "duration": 60,
-                "webpage_url": "https://example.test",
-            }
+            info = VideoMetadata(
+                id="video-1",
+                title="Primero",
+                uploader="Canal",
+                duration=60,
+                webpage_url="https://example.test",
+            )
             tools = [ToolMention("ssh", 2, "Acceso remoto")]
 
             first = upsert_video(library_path, info, video_dir, tools)
-            info["title"] = "Título actualizado"
+            info = VideoMetadata(
+                id="video-1",
+                title="Título actualizado",
+                uploader="Canal",
+                duration=60,
+                webpage_url="https://example.test",
+            )
             second = upsert_video(library_path, info, video_dir, tools)
 
             videos = load_library(library_path)["videos"]
@@ -58,6 +73,33 @@ class LibraryTests(unittest.TestCase):
 
                 self.assertTrue(list(root.glob("library.json.corrupt-*")))
 
+    def test_invalid_entry_is_removed_without_losing_valid_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            library_path = root / "library.json"
+            valid = {"id": "valid", "title": "Válido", "path": "videos/valid", "tools": []}
+            library_path.write_text(json.dumps({"videos": [valid, {"id": 7}]}), encoding="utf-8")
+
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                videos = load_library(library_path)["videos"]
+
+            self.assertEqual([video["id"] for video in videos], ["valid"])
+            self.assertTrue(list(root.glob("library.json.corrupt-*")))
+            self.assertTrue(caught)
+
+    def test_library_read_error_is_not_treated_as_corruption(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            library_path = root / "library.json"
+            library_path.write_text('{"videos": []}', encoding="utf-8")
+
+            with patch.object(Path, "open", side_effect=PermissionError("denegado")):
+                with self.assertRaisesRegex(LibraryError, "No se pudo leer la biblioteca"):
+                    load_library(library_path)
+
+            self.assertFalse(list(root.glob("library.json.corrupt-*")))
+
     def test_rebuild_uses_info_files_and_skips_invalid_entries(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -87,7 +129,36 @@ class LibraryTests(unittest.TestCase):
             result = rebuild_library(root / "library.json", videos_dir)
 
             self.assertEqual(result.rebuilt, 0)
-            self.assertEqual(result.skipped, ["invalid: info.json debe contener un objeto JSON"])
+            self.assertIn("se esperaba un objeto JSON", result.skipped[0])
+
+    def test_rebuild_rejects_info_id_that_differs_from_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            videos_dir = root / "videos"
+            video_dir = videos_dir / "expected"
+            video_dir.mkdir(parents=True)
+            (video_dir / "info.json").write_text(json.dumps({"id": "other"}), encoding="utf-8")
+
+            result = rebuild_library(root / "library.json", videos_dir)
+
+            self.assertEqual(result.rebuilt, 0)
+            self.assertIn("no coincide", result.skipped[0])
+
+    def test_rebuild_reads_tool_names_from_tools_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            videos_dir = root / "videos"
+            video_dir = videos_dir / "demo"
+            video_dir.mkdir(parents=True)
+            (video_dir / "info.json").write_text(json.dumps({"id": "demo", "title": "Demo"}), encoding="utf-8")
+            (video_dir / "tools.json").write_text(
+                json.dumps([{"name": "ssh"}, {"name": "tailscale"}, {"name": "ssh"}]), encoding="utf-8"
+            )
+
+            result = rebuild_library(root / "library.json", videos_dir)
+
+            self.assertEqual(result.rebuilt, 1)
+            self.assertEqual(load_library(root / "library.json")["videos"][0]["tools"], ["ssh", "tailscale"])
 
 
 if __name__ == "__main__":

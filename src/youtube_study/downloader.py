@@ -12,7 +12,7 @@ from yt_dlp.utils import DownloadError
 from yt_dlp.version import __version__ as YTDLP_VERSION
 
 from .errors import SubtitleError
-from .models import VideoInfo
+from .models import YtDlpInfo
 
 MIN_YTDLP_VERSION = (2025, 1, 1)
 
@@ -57,7 +57,7 @@ def download_subtitles(
     *,
     force_download: bool = False,
     quiet: bool = False,
-) -> VideoInfo:
+) -> YtDlpInfo:
     """Download subtitles/captions for a YouTube video using yt-dlp."""
     warn_if_outdated_ytdlp()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -86,7 +86,7 @@ def download_subtitles(
             "No se pudieron descargar los subtítulos. Comprueba la URL, los idiomas solicitados, "
             "los límites de YouTube y que yt-dlp esté actualizado en el venv."
         ) from exc
-    if not info:
+    if not isinstance(info, dict) or not info:
         raise SubtitleError("YouTube no devolvió información para el video solicitado.")
     return info
 

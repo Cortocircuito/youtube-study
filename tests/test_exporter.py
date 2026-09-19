@@ -78,6 +78,7 @@ def test_study_markdown_is_generated_from_structured_result(tmp_path: Path) -> N
 def test_info_written_by_pipeline_contains_analysis_metadata(tmp_path: Path) -> None:
     from src.youtube_study.downloader import SubtitleSelection
     from src.youtube_study.exporter import write_info
+    from src.youtube_study.models import VideoMetadata
 
     info_path = tmp_path / "info.json"
     selection = SubtitleSelection(
@@ -87,7 +88,7 @@ def test_info_written_by_pipeline_contains_analysis_metadata(tmp_path: Path) -> 
         reason="subtítulo manual en idioma solicitado",
     )
 
-    write_info(info_path, {"id": "demo", "title": "Demo"}, selection, analysis_version=1)
+    write_info(info_path, VideoMetadata("demo", "Demo"), selection, analysis_version=1)
 
     payload = json.loads(info_path.read_text(encoding="utf-8"))
     assert payload["analysis"]["format_version"] == 1

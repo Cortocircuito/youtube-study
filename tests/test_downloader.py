@@ -7,6 +7,7 @@ import pytest
 
 from src.youtube_study.downloader import SubtitleError, choose_subtitle, download_subtitles
 from src.youtube_study.exporter import write_info
+from src.youtube_study.models import VideoMetadata
 
 
 def write_vtt(video_dir: Path, video_id: str, language: str, body: str = "caption") -> Path:
@@ -185,7 +186,7 @@ def test_write_info_documents_selected_subtitle(tmp_path: Path) -> None:
     )
 
     info_path = tmp_path / "info.json"
-    write_info(info_path, {"id": video_id, "title": "Demo"}, selection)
+    write_info(info_path, VideoMetadata(video_id, "Demo"), selection)
 
     payload = json.loads(info_path.read_text(encoding="utf-8"))
     assert payload["source_subtitle"]["path"].endswith("vid.es.vtt")

@@ -10,6 +10,7 @@ import pytest
 from src.youtube_study.artifacts import PUBLICATION_JOURNAL, recover_pending_publication
 from src.youtube_study.downloader import SubtitleSelection
 from src.youtube_study.errors import ArtifactRecoveryError, VideoDataError
+from src.youtube_study.models import VideoMetadata
 from src.youtube_study.service import analyze_existing, export_study, generate_study_files
 
 ARTIFACT_NAMES = {
@@ -54,12 +55,12 @@ def test_generate_study_files_writes_all_artifacts_from_one_analysis(tmp_path: P
     )
 
     generate_study_files(
-        {
-            "id": "demo",
-            "title": "Demo Ñ",
-            "uploader": "Canal Ñ",
-            "webpage_url": "https://www.youtube.com/watch?v=demo",
-        },
+        VideoMetadata(
+            id="demo",
+            title="Demo Ñ",
+            uploader="Canal Ñ",
+            webpage_url="https://www.youtube.com/watch?v=demo",
+        ),
         video_dir,
         selection,
         tmp_path / "library.json",
@@ -214,7 +215,7 @@ def test_empty_subtitle_does_not_overwrite_existing_artifacts(tmp_path: Path) ->
     selection = SubtitleSelection(subtitle_path, "es", "manual", "test")
 
     with pytest.raises(VideoDataError, match="no contiene texto utilizable"):
-        generate_study_files({"id": "demo"}, video_dir, selection, tmp_path / "library.json")
+        generate_study_files(VideoMetadata("demo", "demo"), video_dir, selection, tmp_path / "library.json")
 
     assert summary_path.read_text(encoding="utf-8") == "resultado válido"
     assert not (video_dir / "info.json").exists()
@@ -235,7 +236,7 @@ def test_writer_failure_does_not_publish_partial_generation(monkeypatch, tmp_pat
     monkeypatch.setattr("src.youtube_study.service.write_summary", fail_writer)
 
     with pytest.raises(OSError, match="sin espacio"):
-        generate_study_files({"id": "demo"}, video_dir, selection, tmp_path / "library.json")
+        generate_study_files(VideoMetadata("demo", "demo"), video_dir, selection, tmp_path / "library.json")
 
     assert summary_path.read_text(encoding="utf-8") == "resultado anterior"
     assert not (video_dir / "info.json").exists()
@@ -261,7 +262,7 @@ def test_publish_failure_restores_previous_generation(monkeypatch, tmp_path: Pat
     monkeypatch.setattr("src.youtube_study.artifacts.os.replace", fail_while_publishing)
 
     with pytest.raises(OSError, match="fallo de publicación"):
-        generate_study_files({"id": "demo"}, video_dir, selection, tmp_path / "library.json")
+        generate_study_files(VideoMetadata("demo", "demo"), video_dir, selection, tmp_path / "library.json")
 
     assert {name: (video_dir / name).read_bytes() for name in previous} == previous
     assert not list(video_dir.parent.glob(".demo.backup-*"))
@@ -288,7 +289,7 @@ def test_backup_failure_keeps_previous_artifact_bytes(monkeypatch, tmp_path: Pat
     monkeypatch.setattr("src.youtube_study.artifacts.os.replace", fail_while_backing_up)
 
     with pytest.raises(OSError, match="fallo de respaldo"):
-        generate_study_files({"id": "demo"}, video_dir, selection, tmp_path / "library.json")
+        generate_study_files(VideoMetadata("demo", "demo"), video_dir, selection, tmp_path / "library.json")
 
     assert summary_path.read_bytes() == previous
     assert not (video_dir / "info.json").exists()
@@ -314,7 +315,7 @@ def test_journal_creation_failure_does_not_touch_previous_generation(monkeypatch
     monkeypatch.setattr("src.youtube_study.artifacts.os.replace", fail_journal_replace)
 
     with pytest.raises(OSError, match="fallo de journal"):
-        generate_study_files({"id": "demo"}, video_dir, selection, tmp_path / "library.json")
+        generate_study_files(VideoMetadata("demo", "demo"), video_dir, selection, tmp_path / "library.json")
 
     assert summary_path.read_bytes() == previous
     assert not (video_dir / PUBLICATION_JOURNAL).exists()
@@ -333,7 +334,7 @@ def test_invalid_pending_journal_blocks_overwrite_and_preserves_previous_bytes(t
     selection = SubtitleSelection(subtitle_path, "es", "manual", "test")
 
     with pytest.raises(ArtifactRecoveryError, match="No se pudo leer el journal"):
-        generate_study_files({"id": "demo"}, video_dir, selection, tmp_path / "library.json")
+        generate_study_files(VideoMetadata("demo", "demo"), video_dir, selection, tmp_path / "library.json")
 
     assert summary_path.read_bytes() == previous
     assert (video_dir / PUBLICATION_JOURNAL).exists()
@@ -361,7 +362,7 @@ def test_restore_failure_preserves_backup_with_previous_bytes(monkeypatch, tmp_p
     monkeypatch.setattr("src.youtube_study.artifacts.os.replace", fail_publish_and_restore)
 
     with pytest.raises(ArtifactRecoveryError, match="Journal conservado en"):
-        generate_study_files({"id": "demo"}, video_dir, selection, tmp_path / "library.json")
+        generate_study_files(VideoMetadata("demo", "demo"), video_dir, selection, tmp_path / "library.json")
 
     backup_dirs = list(video_dir.parent.glob(".demo.backup-*"))
     assert len(backup_dirs) == 1
@@ -389,7 +390,7 @@ def test_cleanup_failure_after_rollback_does_not_lose_previous_generation(monkey
     monkeypatch.setattr("src.youtube_study.artifacts.shutil.rmtree", lambda *args, **kwargs: None)
 
     with pytest.raises(ArtifactRecoveryError, match="Journal conservado en"):
-        generate_study_files({"id": "demo"}, video_dir, selection, tmp_path / "library.json")
+        generate_study_files(VideoMetadata("demo", "demo"), video_dir, selection, tmp_path / "library.json")
 
     assert {name: (video_dir / name).read_bytes() for name in previous} == previous
     assert len(list(video_dir.parent.glob(".demo.backup-*"))) == 1
@@ -416,7 +417,7 @@ def test_interrupted_publication_can_be_recovered_from_journal(monkeypatch, tmp_
     monkeypatch.setattr("src.youtube_study.artifacts.os.replace", interrupt_while_publishing)
 
     with pytest.raises(KeyboardInterrupt):
-        generate_study_files({"id": "demo"}, video_dir, selection, tmp_path / "library.json")
+        generate_study_files(VideoMetadata("demo", "demo"), video_dir, selection, tmp_path / "library.json")
 
     assert (video_dir / PUBLICATION_JOURNAL).exists()
     monkeypatch.setattr("src.youtube_study.artifacts.os.replace", original_replace)
@@ -438,7 +439,7 @@ def test_committed_publication_survives_interrupted_cleanup(monkeypatch, tmp_pat
     monkeypatch.setattr("src.youtube_study.artifacts.shutil.rmtree", lambda *args, **kwargs: None)
 
     with pytest.raises(ArtifactRecoveryError, match="limpieza quedó pendiente"):
-        generate_study_files({"id": "demo"}, video_dir, selection, tmp_path / "library.json")
+        generate_study_files(VideoMetadata("demo", "demo"), video_dir, selection, tmp_path / "library.json")
 
     published_summary = (video_dir / "summary.md").read_bytes()
     assert (video_dir / PUBLICATION_JOURNAL).exists()
@@ -466,7 +467,7 @@ def test_library_failure_happens_after_complete_generation_is_published(monkeypa
     monkeypatch.setattr("src.youtube_study.service.upsert_video", fail_library_update)
 
     with pytest.raises(OSError, match="fallo de biblioteca"):
-        generate_study_files({"id": "demo", "title": "Demo"}, video_dir, selection, library_path)
+        generate_study_files(VideoMetadata("demo", "Demo"), video_dir, selection, library_path)
 
     assert ARTIFACT_NAMES.issubset({path.name for path in video_dir.iterdir()})
     assert library_path.read_bytes() == previous_library
