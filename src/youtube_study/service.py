@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import tempfile
 from pathlib import Path
 
-from .analyzer import analyze_cues
+from .analyzer import AnalysisResult, analyze_cues
 from .downloader import SubtitleSelection, choose_subtitle, download_subtitles
 from .errors import VideoDataError
 from .exporter import (
@@ -26,33 +29,98 @@ from .library import library_path_from_videos_dir, upsert_video
 from .models import VideoInfo
 from .transcript import clean_vtt
 
+GENERATED_ARTIFACTS = (
+    "info.json",
+    "transcript.txt",
+    "transcript.clean.txt",
+    "transcript.paragraphs.md",
+    "summary.md",
+    "tools.md",
+    "tools.json",
+    "concepts.md",
+    "concepts.json",
+    "questions.md",
+    "flashcards.md",
+    "study-guide.md",
+    "study.md",
+    "anki.csv",
+)
+
 
 def requested_languages(languages: str) -> list[str]:
     return [language.strip() for language in languages.split(",") if language.strip()]
+
+
+def _write_study_files(info: VideoInfo, output_dir: Path, subtitle: SubtitleSelection) -> AnalysisResult:
+    video_id = info["id"]
+    result = analyze_cues(clean_vtt(subtitle.path))
+    if not result.cues:
+        raise VideoDataError(f"El subtítulo seleccionado no contiene texto utilizable: {subtitle.path}")
+    title = info.get("title", video_id)
+    source_url = info.get("webpage_url")
+
+    write_info(output_dir / "info.json", info, subtitle, analysis_version=result.format_version)
+    write_transcript(output_dir / "transcript.txt", result.cues)
+    write_clean_transcript(output_dir / "transcript.clean.txt", result.cues)
+    write_transcript_paragraphs(output_dir / "transcript.paragraphs.md", result.cues)
+    write_summary(output_dir / "summary.md", title, result.keywords, result.ideas, result.sections, source_url)
+    write_tools(output_dir / "tools.md", result.tools)
+    write_tools_json(output_dir / "tools.json", result.tools)
+    write_concepts(output_dir / "concepts.md", result.sections)
+    write_concepts_json(output_dir / "concepts.json", result.concepts)
+    write_questions(output_dir / "questions.md", result.questions, source_url)
+    write_flashcards(output_dir / "flashcards.md", result.cards, source_url)
+    write_study_guide(output_dir / "study-guide.md", title, result.tools, result.questions)
+    write_study_markdown_from_result(output_dir / "study.md", title, result, source_url)
+    write_anki_csv(output_dir / "anki.csv", result.cards, video_id, info.get("uploader"), source_url)
+    return result
+
+
+def _publish_staged_files(staging_dir: Path, video_dir: Path) -> None:
+    """Publish one complete generation and restore previous files if replacement fails."""
+    video_dir.mkdir(parents=True, exist_ok=True)
+    backup_dir = Path(tempfile.mkdtemp(prefix=f".{video_dir.name}.backup-", dir=video_dir.parent))
+    published: list[str] = []
+    backed_up: list[str] = []
+    keep_backup = False
+    try:
+        for name in GENERATED_ARTIFACTS:
+            destination = video_dir / name
+            if destination.exists():
+                os.replace(destination, backup_dir / name)
+                backed_up.append(name)
+        for name in GENERATED_ARTIFACTS:
+            os.replace(staging_dir / name, video_dir / name)
+            published.append(name)
+    except OSError:
+        for name in published:
+            (video_dir / name).unlink(missing_ok=True)
+        try:
+            for name in backed_up:
+                backup = backup_dir / name
+                if backup.exists():
+                    os.replace(backup, video_dir / name)
+        except OSError as rollback_error:
+            keep_backup = True
+            raise VideoDataError(
+                f"Falló la publicación y no se pudo restaurar completamente. Respaldo conservado en {backup_dir}"
+            ) from rollback_error
+        raise
+    finally:
+        if not keep_backup:
+            shutil.rmtree(backup_dir, ignore_errors=True)
 
 
 def generate_study_files(info: VideoInfo, video_dir: Path, subtitle: SubtitleSelection, library_path: Path) -> Path:
     video_id = info.get("id")
     if not video_id:
         raise VideoDataError("No se puede analizar un video sin id.")
-    result = analyze_cues(clean_vtt(subtitle.path))
-    title = info.get("title", video_id)
-    source_url = info.get("webpage_url")
+    video_dir.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=f".{video_id}.staging-", dir=video_dir.parent) as temp_dir:
+        staging_dir = Path(temp_dir)
+        result = _write_study_files(info, staging_dir, subtitle)
+        _publish_staged_files(staging_dir, video_dir)
 
-    write_info(video_dir / "info.json", info, subtitle, analysis_version=result.format_version)
-    write_transcript(video_dir / "transcript.txt", result.cues)
-    write_clean_transcript(video_dir / "transcript.clean.txt", result.cues)
-    write_transcript_paragraphs(video_dir / "transcript.paragraphs.md", result.cues)
-    write_summary(video_dir / "summary.md", title, result.keywords, result.ideas, result.sections, source_url)
-    write_tools(video_dir / "tools.md", result.tools)
-    write_tools_json(video_dir / "tools.json", result.tools)
-    write_concepts(video_dir / "concepts.md", result.sections)
-    write_concepts_json(video_dir / "concepts.json", result.concepts)
-    write_questions(video_dir / "questions.md", result.questions, source_url)
-    write_flashcards(video_dir / "flashcards.md", result.cards, source_url)
-    write_study_guide(video_dir / "study-guide.md", title, result.tools, result.questions)
-    write_study_markdown_from_result(video_dir / "study.md", title, result, source_url)
-    write_anki_csv(video_dir / "anki.csv", result.cards, video_id, info.get("uploader"), source_url)
     upsert_video(library_path, info, video_dir, result.tools)
     return video_dir
 

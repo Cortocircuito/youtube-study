@@ -5,6 +5,7 @@ import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
@@ -60,11 +61,15 @@ def download_subtitles(
     """Download subtitles/captions for a YouTube video using yt-dlp."""
     warn_if_outdated_ytdlp()
     out_dir.mkdir(parents=True, exist_ok=True)
+    requested_languages = [x.strip() for x in langs.split(",") if x.strip()]
+    download_languages = list(requested_languages)
+    if not any(_language_base(language) == "en" for language in download_languages):
+        download_languages.append("en.*")
     opts = {
         "skip_download": True,
         "writesubtitles": True,
         "writeautomaticsub": True,
-        "subtitleslangs": [x.strip() for x in langs.split(",") if x.strip()],
+        "subtitleslangs": download_languages,
         "subtitlesformat": "vtt",
         "outtmpl": str(out_dir / "%(id)s" / "%(id)s.%(ext)s"),
         "quiet": quiet,
@@ -134,6 +139,14 @@ def _format_metadata(formats: Any) -> dict[str, Any]:
     return {}
 
 
+def _url_language(metadata: dict[str, Any], parameter: str) -> str | None:
+    url = metadata.get("url")
+    if not isinstance(url, str):
+        return None
+    values = parse_qs(urlsplit(url).query).get(parameter)
+    return values[-1] if values else None
+
+
 def _is_translation(language: str, kind: str, metadata: dict[str, Any]) -> bool:
     if kind != "automatic":
         return False
@@ -143,6 +156,8 @@ def _is_translation(language: str, kind: str, metadata: dict[str, Any]) -> bool:
     source_language = metadata.get("source_language")
     if source_language:
         return _language_base(str(source_language)) != _language_base(language)
+    if _url_language(metadata, "tlang"):
+        return True
     if language.endswith("-orig"):
         return False
     return False
@@ -150,7 +165,7 @@ def _is_translation(language: str, kind: str, metadata: dict[str, Any]) -> bool:
 
 def _source_language(metadata: dict[str, Any]) -> str | None:
     value = metadata.get("source_language")
-    return str(value) if value else None
+    return str(value) if value else _url_language(metadata, "lang")
 
 
 def subtitle_inventory(info: dict[str, Any] | None, video_dir: Path, video_id: str) -> list[SubtitleCandidate]:
@@ -206,7 +221,7 @@ def _selection_from_info(
     if preferred_langs and not any(_language_matches(language, requested) for requested in preferred_langs):
         return None
     path = Path(path_value)
-    if not path.is_absolute() and not path.exists():
+    if not path.exists():
         path = video_dir / path.name
     if not path.exists():
         return None

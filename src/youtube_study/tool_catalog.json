@@ -22,7 +22,7 @@
       "name": "moshi",
       "description": "App móvil para gestionar conexiones SSH/Mosh y agentes desde el teléfono.",
       "category": "tool",
-      "aliases": ["moshie", "mochi"]
+      "aliases": ["moshie"]
     },
     {
       "name": "herdr",
@@ -46,7 +46,7 @@
       "name": "claude",
       "description": "Modelo/agente de IA usado para tareas de código.",
       "category": "model",
-      "aliases": ["claudio", "clou"]
+      "aliases": ["clou"]
     },
     {
       "name": "codex",

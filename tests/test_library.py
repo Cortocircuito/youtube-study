@@ -45,6 +45,19 @@ class LibraryTests(unittest.TestCase):
             self.assertEqual(json.loads(library_path.read_text(encoding="utf-8")), {"videos": []})
             self.assertTrue(caught)
 
+    def test_structurally_invalid_library_is_backed_up_and_recovered(self) -> None:
+        for payload in ({}, {"videos": [None]}):
+            with self.subTest(payload=payload), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                library_path = root / "library.json"
+                library_path.write_text(json.dumps(payload), encoding="utf-8")
+
+                with warnings.catch_warnings(record=True):
+                    warnings.simplefilter("always")
+                    self.assertEqual(load_library(library_path), {"videos": []})
+
+                self.assertTrue(list(root.glob("library.json.corrupt-*")))
+
     def test_rebuild_uses_info_files_and_skips_invalid_entries(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -62,6 +75,19 @@ class LibraryTests(unittest.TestCase):
             self.assertEqual(result.rebuilt, 1)
             self.assertEqual(len(result.skipped), 2)
             self.assertEqual(load_library(root / "library.json")["videos"][0]["id"], "valid")
+
+    def test_rebuild_skips_non_object_info_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            videos_dir = root / "videos"
+            video_dir = videos_dir / "invalid"
+            video_dir.mkdir(parents=True)
+            (video_dir / "info.json").write_text("[]", encoding="utf-8")
+
+            result = rebuild_library(root / "library.json", videos_dir)
+
+            self.assertEqual(result.rebuilt, 0)
+            self.assertEqual(result.skipped, ["invalid: info.json debe contener un objeto JSON"])
 
 
 if __name__ == "__main__":

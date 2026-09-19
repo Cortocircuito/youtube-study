@@ -5,11 +5,12 @@ Aplicación local para estudiar videos de YouTube a partir de sus subtítulos, s
 ## Qué hace
 
 - Descarga subtítulos con `yt-dlp` y elige de forma preferente español manual, español automático original, traducción solicitada, inglés y un fallback controlado.
-- Limpia subtítulos VTT, elimina solapamientos de captions automáticos y normaliza aliases frecuentes.
+- Limpia subtítulos VTT y elimina solapamientos cercanos de captions automáticos sin reescribir el texto fuente.
 - Genera resúmenes extractivos deduplicados, conceptos, preguntas respondidas, flashcards, guía de estudio, un Markdown consolidado y CSV para Anki.
 - Añade referencias al instante exacto del video en resúmenes, preguntas, tarjetas y Anki cuando la URL está disponible.
 - Mantiene una biblioteca local y permite listar, consultar, buscar, reanalizar y exportar videos.
 - Clasifica hallazgos como herramienta, protocolo, modelo, servicio o candidato heurístico.
+- Genera primero los artefactos en staging y conserva la generación anterior si el análisis o una escritura falla.
 
 ## Requisitos e instalación
 
@@ -26,7 +27,8 @@ Para ejecutar tests, lint y formato de desarrollo:
 ```bash
 pip install -r requirements-dev.txt
 python -m ruff check .
-python -m pytest
+python -m coverage run -m pytest
+python -m coverage report
 ```
 
 ## Uso
@@ -63,6 +65,8 @@ python app.py export VIDEO_ID --format markdown|anki|all
 ```
 
 Los errores previstos —video inexistente, metadata local inválida, subtítulos no disponibles o argumentos no válidos— se imprimen sin traceback y el comando termina con código distinto de cero.
+
+La descarga añade inglés como fallback cuando no figura entre los idiomas solicitados. La selección distingue subtítulos manuales, automáticos originales y traducciones usando la metadata de `yt-dlp`.
 
 ## Datos y archivos generados
 
@@ -106,7 +110,8 @@ Validación completa:
 python -m ruff format --check .
 python -m ruff check .
 python -m py_compile app.py src/youtube_study/*.py
-python -m pytest
+python -m coverage run -m pytest
+python -m coverage report
 ```
 
 El skill compartido para resumir videos está versionado en `.pi/skills/video-study-summary/`.

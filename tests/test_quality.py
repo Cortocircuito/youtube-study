@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from src.youtube_study.analyzer import STOPWORDS, analyze_cues, cue_windows
-from src.youtube_study.transcript import clean_vtt
+from src.youtube_study.transcript import Cue, clean_vtt
 
 FIXTURES = Path(__file__).parent / "fixtures"
 CASES = {
@@ -20,6 +20,12 @@ CASES = {
         "terms": {"consultas", "índice", "transacciones"},
         "first_timestamp": "00:00:02",
         "rolling_prefix": "antes de optimizar una base de datos",
+    },
+    "security": {
+        "path": FIXTURES / "quality_security.vtt",
+        "terms": {"cifrado", "permisos", "copias"},
+        "first_timestamp": "00:00:03",
+        "rolling_prefix": "el cifrado protege los archivos",
     },
 }
 
@@ -69,6 +75,7 @@ def test_quality_fixtures_are_distinct_and_preserve_known_timestamps() -> None:
         vocabulary[name] = normalized_tokens(text)
 
     assert token_similarity(" ".join(vocabulary["gardening"]), " ".join(vocabulary["databases"])) < 0.15
+    assert token_similarity(" ".join(vocabulary["security"]), " ".join(vocabulary["gardening"])) < 0.15
 
 
 def test_current_analysis_finds_expected_topics_without_domain_specific_setup() -> None:
@@ -115,10 +122,38 @@ def test_questions_and_cards_have_source_answers_and_timestamps() -> None:
     assert referenced_answer_ratio(questions) == 1.0
     assert referenced_answer_ratio(cards) == 1.0
 
-    normalized_questions = [question_key(item_field(item, "question")) for item in questions]
-    assert len(normalized_questions) == len(set(normalized_questions))
+    for result in results:
+        normalized_questions = [
+            question_key(item_field(item, "question")) for group in result.questions.values() for item in group
+        ]
+        assert len(normalized_questions) == len(set(normalized_questions))
     assert {item_field(item, "category") for item in questions} == {"basicas", "comprension", "practicas"}
     assert all("type::" in item_field(card, "tags") for card in cards)
+
+
+def test_practical_question_references_the_cue_containing_its_answer() -> None:
+    result = analyze_cues(
+        [
+            clean_vtt(CASES["gardening"]["path"])[0],
+            *clean_vtt(CASES["gardening"]["path"])[1:],
+        ]
+    )
+
+    for question in result.questions["practicas"]:
+        matching = [cue for cue in result.cues if normalized_tokens(question.answer) & normalized_tokens(cue.text)]
+        assert matching
+        assert question.timestamp in {cue.start for cue in matching}
+
+
+def test_descriptive_content_does_not_invent_a_practical_recommendation() -> None:
+    result = analyze_cues(
+        [
+            Cue("00:00:01", "La fotosíntesis transforma energía luminosa en energía química para la planta."),
+            Cue("00:00:10", "La clorofila absorbe parte de la luz disponible durante este proceso."),
+        ]
+    )
+
+    assert result.questions["practicas"] == []
 
 
 def question_key(question: str) -> str:

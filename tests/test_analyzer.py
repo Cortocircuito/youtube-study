@@ -1,6 +1,13 @@
 from pathlib import Path
 
-from src.youtube_study.analyzer import analyze_cues, concept_mentions, detect_tools, detect_unknown_tools
+from src.youtube_study.analyzer import (
+    analyze_cues,
+    concept_mentions,
+    cue_windows,
+    detect_tools,
+    detect_unknown_tools,
+    token_similarity,
+)
 from src.youtube_study.transcript import Cue
 
 FIXTURE = Path(__file__).parent / "fixtures" / "heuristics.txt"
@@ -48,3 +55,33 @@ def test_tool_flashcards_keep_classification_and_transcript_source() -> None:
     assert card.timestamp == "00:01:23"
     assert "tool protocol known ssh" in card.tags
     assert "type::basicas" in card.tags
+
+
+def test_similarity_preserves_negations_and_changed_numbers() -> None:
+    positive = "Es recomendable abrir 22 puertos públicos para acceder al servidor."
+    negative = "No es recomendable abrir 443 puertos públicos para acceder al servidor."
+
+    assert token_similarity(positive, negative) == 0.0
+    assert len(cue_windows([Cue("00:00:01", positive), Cue("00:00:02", negative)])) == 1
+    assert positive in cue_windows([Cue("00:00:01", positive), Cue("00:00:02", negative)])[0].text
+    assert negative in cue_windows([Cue("00:00:01", positive), Cue("00:00:02", negative)])[0].text
+
+
+def test_ambiguous_names_are_not_rewritten_or_detected_as_tools() -> None:
+    text = "Claudio prepara mochi en casa."
+
+    assert detect_tools(text) == []
+
+
+def test_basic_question_prefers_an_explanatory_mention() -> None:
+    explanation = "SSH permite acceder de forma remota mediante una conexión cifrada."
+    result = analyze_cues(
+        [
+            Cue("00:00:01", "Hoy vamos a mencionar SSH dentro del recorrido general."),
+            Cue("00:00:10", explanation),
+        ]
+    )
+
+    question = next(item for item in result.questions["basicas"] if "ssh" in item.question.lower())
+    assert question.answer == explanation
+    assert question.timestamp == "00:00:10"

@@ -5,7 +5,7 @@ from collections import Counter
 from dataclasses import dataclass
 
 from .tool_catalog import TOOL_CATALOG, UNKNOWN_CANDIDATE_EXCLUSIONS
-from .transcript import Cue, chunk_by_minutes
+from .transcript import Cue, chunk_by_minutes, normalize_aliases, seconds_from_timestamp
 
 ANALYSIS_FORMAT_VERSION = 2
 
@@ -88,7 +88,7 @@ def keywords(text: str, limit: int = 25) -> list[tuple[str, int]]:
 
 
 def detect_tools(text: str) -> list[ToolMention]:
-    lower = text.lower()
+    lower = normalize_aliases(text).lower()
     mentions: list[ToolMention] = []
     for name, tool in TOOL_CATALOG.items():
         aliases = [name, *tool.get("aliases", [])]
@@ -155,7 +155,15 @@ def content_tokens(text: str) -> set[str]:
     return {word.strip(".-_") for word in words if word.strip(".-_") not in STOPWORDS and not word.isdigit()}
 
 
+def semantic_markers(text: str) -> tuple[set[str], set[str]]:
+    words = set(re.findall(r"\b(?:no|sin|nunca|jamás|tampoco|ni)\b", text.lower()))
+    numbers = set(re.findall(r"\b\d+(?:[.,]\d+)?\b", text))
+    return words, numbers
+
+
 def token_similarity(left: str, right: str) -> float:
+    if semantic_markers(left) != semantic_markers(right):
+        return 0.0
     left_tokens = content_tokens(left)
     right_tokens = content_tokens(right)
     if not left_tokens or not right_tokens:
@@ -176,7 +184,11 @@ def cue_windows(cues: list[Cue], size: int = 3) -> list[TextWindow]:
     """Build chronological, non-overlapping windows while dropping near-duplicate cues."""
     unique_cues: list[Cue] = []
     for cue in cues:
-        if any(token_similarity(cue.text, previous.text) >= 0.72 for previous in unique_cues[-8:]):
+        if any(
+            abs(seconds_from_timestamp(cue.start) - seconds_from_timestamp(previous.start)) <= 15
+            and token_similarity(cue.text, previous.text) >= 0.72
+            for previous in unique_cues[-8:]
+        ):
             continue
         unique_cues.append(cue)
 
@@ -257,7 +269,17 @@ def concept_mentions(cues: list[Cue], limit: int = 20) -> list[ConceptMention]:
 
 def source_cue(cues: list[Cue], term: str) -> Cue | None:
     pattern = re.compile(r"(?<![\w.-])" + re.escape(term) + r"(?![\w.-])", re.IGNORECASE)
-    return next((cue for cue in cues if pattern.search(cue.text)), None)
+    matches = [cue for cue in cues if pattern.search(cue.text)]
+    if not matches:
+        return None
+    explanation = re.compile(
+        r"\b(?:es|son|permite|sirve|consiste|significa|funciona|se usa|se utiliza|ayuda|protege|conecta)\b",
+        re.IGNORECASE,
+    )
+    return max(
+        enumerate(matches),
+        key=lambda item: (bool(explanation.search(item[1].text)), len(content_tokens(item[1].text)), -item[0]),
+    )[1]
 
 
 def question_key(question: str) -> str:
@@ -286,15 +308,26 @@ def question_topic(text: str, excluded: set[str] | None = None) -> str:
     return next((word for word, _ in keywords(text, 8) if word not in ignored), "este tema")
 
 
-def practical_excerpt(idea: str) -> str:
+def practical_excerpt(idea: str) -> str | None:
     sentences = split_sentences(idea)
     action_pattern = re.compile(
         r"\b(?:debe|debería|conviene|primero|evita|revisa|compara|ajusta|deja|riega|hay que|no conviene)\b",
         re.IGNORECASE,
     )
-    return next(
-        (sentence for sentence in sentences if action_pattern.search(sentence)), sentences[0] if sentences else idea
-    )
+    return next((sentence for sentence in sentences if action_pattern.search(sentence)), None)
+
+
+def timestamp_for_excerpt(cues: list[Cue], excerpt: str, fallback: str) -> str:
+    excerpt_tokens = content_tokens(excerpt)
+    if not excerpt_tokens:
+        return fallback
+    matching = [
+        (len(excerpt_tokens & content_tokens(cue.text)) / len(excerpt_tokens), cue)
+        for cue in cues
+        if content_tokens(cue.text)
+    ]
+    score, cue = max(matching, default=(0.0, None), key=lambda item: item[0])
+    return cue.start if cue is not None and score >= 0.5 else fallback
 
 
 def questions(
@@ -342,14 +375,16 @@ def questions(
         )
         used_topics.add(topic)
 
-    for timestamp, idea in ideas[-3:]:
-        excerpt = practical_excerpt(idea)
+    practical_candidates = [
+        (timestamp, excerpt) for timestamp, idea in ideas if (excerpt := practical_excerpt(idea)) is not None
+    ]
+    for timestamp, excerpt in practical_candidates[-3:]:
         topic = question_topic(excerpt)
         add(
             "practicas",
             f"¿Qué recomendación o criterio práctico se presenta sobre {topic}?",
             excerpt,
-            timestamp,
+            timestamp_for_excerpt(cues, excerpt, timestamp),
             excerpt,
         )
 

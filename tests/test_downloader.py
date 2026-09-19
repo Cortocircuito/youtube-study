@@ -79,6 +79,30 @@ def test_choose_subtitle_uses_translation_before_english_fallback(tmp_path: Path
     assert selected.reason == "traducción automática en idioma solicitado"
 
 
+def test_choose_subtitle_detects_translation_from_ytdlp_url_metadata(tmp_path: Path) -> None:
+    video_id = "vid"
+    write_vtt(tmp_path, video_id, "es", "translated")
+    write_vtt(tmp_path, video_id, "en", "english")
+    info = {
+        "automatic_captions": {
+            "es": [
+                {
+                    "ext": "vtt",
+                    "url": "https://www.youtube.com/api/timedtext?lang=en&tlang=es&fmt=vtt",
+                }
+            ],
+            "en": [{"ext": "vtt", "url": "https://www.youtube.com/api/timedtext?lang=en&fmt=vtt"}],
+        }
+    }
+
+    selected = choose_subtitle(tmp_path, video_id, ["es"], info=info)
+
+    assert selected.path.name == "vid.es.vtt"
+    assert selected.is_translation is True
+    assert selected.source_language == "en"
+    assert selected.reason == "traducción automática en idioma solicitado"
+
+
 def test_choose_subtitle_keeps_legacy_file_fallback_without_metadata(tmp_path: Path) -> None:
     video_id = "vid"
     write_vtt(tmp_path, video_id, "en", "english")
@@ -125,6 +149,29 @@ def test_download_subtitles_passes_force_and_quiet_options(monkeypatch, tmp_path
     assert captured["no_warnings"] is True
     assert captured["noprogress"] is True
     assert captured["download"] is True
+
+
+def test_download_subtitles_adds_english_as_fallback(monkeypatch, tmp_path: Path) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeYoutubeDL:
+        def __init__(self, opts: dict[str, object]) -> None:
+            captured.update(opts)
+
+        def __enter__(self) -> "FakeYoutubeDL":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def extract_info(self, url: str, download: bool) -> dict[str, object]:
+            return {"id": "vid"}
+
+    monkeypatch.setattr("src.youtube_study.downloader.YoutubeDL", FakeYoutubeDL)
+
+    download_subtitles("https://example.test/video", tmp_path, "es-419,es")
+
+    assert captured["subtitleslangs"] == ["es-419", "es", "en.*"]
 
 
 def test_write_info_documents_selected_subtitle(tmp_path: Path) -> None:

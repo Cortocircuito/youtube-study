@@ -11,14 +11,15 @@ La aplicación funciona localmente sin Ollama y permite:
 - Mantener `data/library.json` y usar `list`, `show`, `search`, `analyze`, `export` y `rebuild-library`.
 - Regenerar análisis antiguos al formato v2 sin red cuando los subtítulos ya están guardados.
 - Validar cambios mediante Ruff, compilación, pytest y GitHub Actions.
+- Medir cobertura de ramas en CI sin imponer todavía un umbral. La referencia local actual es 79 %; la medición de `cli.py` no incluye los subprocesos de sus pruebas funcionales.
 
 ## Prioridades próximas sin IA
 
-1. Ampliar fixtures de subtítulos automáticos ruidosos y mejorar puntuación/separación de párrafos.
-2. Refinar conceptos y formulación de preguntas con métricas pedagógicas conservadoras.
-3. Medir cobertura de tests e identificar módulos críticos antes de fijar un umbral.
-4. Mejorar filtros de biblioteca por canal, herramienta, tema y estado de estudio.
-5. Reforzar reintentos y recuperación ante fallos temporales de descarga sin sobrescribir resultados válidos.
+1. Mejorar puntuación y separación de párrafos con más fixtures de subtítulos automáticos reales y sanitizados.
+2. Ampliar las ramas cubiertas de descarga y recuperación antes de decidir si conviene fijar un umbral.
+3. Mejorar filtros de biblioteca por canal, herramienta, tema y estado de estudio.
+4. Reforzar reintentos ante fallos temporales de descarga sin sobrescribir resultados válidos.
+5. Evaluar conceptos compuestos sin reducir la fidelidad extractiva del análisis.
 
 ## Posibles mejoras posteriores
 

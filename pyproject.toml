@@ -5,3 +5,11 @@ extend-exclude = ["data", "data_run"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+
+[tool.coverage.run]
+branch = true
+source = ["src/youtube_study"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

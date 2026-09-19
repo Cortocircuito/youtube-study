@@ -48,6 +48,21 @@ def _backup_invalid_library(path: Path) -> Path:
     return backup
 
 
+def _recover_invalid_library(path: Path, reason: str) -> dict[str, list[dict[str, Any]]]:
+    try:
+        backup = _backup_invalid_library(path)
+    except OSError as backup_error:
+        raise LibraryError(f"No se pudo leer ni respaldar la biblioteca: {path}") from backup_error
+    recovered = _empty_library()
+    save_library(path, recovered)
+    warnings.warn(
+        f"{reason} Se respaldó en {backup} y se creó una biblioteca vacía.",
+        RuntimeWarning,
+        stacklevel=2,
+    )
+    return recovered
+
+
 def load_library(path: Path) -> dict[str, Any]:
     """Load local library, preserving a backup and recovering from invalid JSON."""
     if not path.exists() or path.stat().st_size == 0:
@@ -56,29 +71,11 @@ def load_library(path: Path) -> dict[str, Any]:
         with path.open("r", encoding="utf-8") as file:
             data = json.load(file)
     except (OSError, json.JSONDecodeError):
-        try:
-            backup = _backup_invalid_library(path)
-        except OSError as backup_error:
-            raise LibraryError(f"No se pudo leer ni respaldar la biblioteca: {path}") from backup_error
-        recovered = _empty_library()
-        save_library(path, recovered)
-        warnings.warn(
-            f"La biblioteca estaba dañada y se respaldó en {backup}. Se creó una biblioteca vacía.",
-            RuntimeWarning,
-            stacklevel=2,
-        )
-        return recovered
+        return _recover_invalid_library(path, "La biblioteca estaba dañada.")
 
-    if not isinstance(data, dict) or not isinstance(data.get("videos", []), list):
-        backup = _backup_invalid_library(path)
-        recovered = _empty_library()
-        save_library(path, recovered)
-        warnings.warn(
-            f"La estructura de la biblioteca era inválida y se respaldó en {backup}. Se creó una biblioteca vacía.",
-            RuntimeWarning,
-            stacklevel=2,
-        )
-        return recovered
+    videos = data.get("videos") if isinstance(data, dict) else None
+    if not isinstance(videos, list) or not all(isinstance(video, dict) for video in videos):
+        return _recover_invalid_library(path, "La estructura de la biblioteca era inválida.")
     return data
 
 
@@ -204,6 +201,9 @@ def rebuild_library(path: Path, videos_dir: Path) -> RebuildResult:
             info = json.loads(info_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             skipped.append(f"{video_dir.name}: info.json inválido")
+            continue
+        if not isinstance(info, dict):
+            skipped.append(f"{video_dir.name}: info.json debe contener un objeto JSON")
             continue
         info.setdefault("id", video_dir.name)
         previous_entry = previous.get(str(info["id"]), {})

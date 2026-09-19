@@ -30,10 +30,8 @@ def timestamp_from_seconds(total: int) -> str:
 
 ALIASES = {
     r"\bmoshie\b": "Moshi",
-    r"\bmochi\b": "Moshi",
     r"\bherder\b": "Herdr",
     r"\bgerd\b": "Herdr",
-    r"\bclaudio\b": "Claude",
     r"\bclou\b": "Claude",
 }
 
@@ -60,7 +58,7 @@ def clean_vtt(path: Path) -> list[Cue]:
                 line = re.sub(r"\s+", " ", line).strip()
                 if line:
                     cleaned_lines.append(line)
-            text = normalize_aliases(merge_caption_lines(cleaned_lines))
+            text = merge_caption_lines(cleaned_lines)
             if text:
                 cues.append(Cue(current_time, text))
         current_time = ""
@@ -101,13 +99,18 @@ def remove_rolling_overlaps(cues: list[Cue]) -> list[Cue]:
     """Reduce duplicated text produced by YouTube rolling auto-captions."""
     result: list[Cue] = []
     previous_words: list[str] = []
+    previous_start: int | None = None
     for cue in cues:
         words = cue.text.split()
         if not words:
             continue
+        cue_start = seconds_from_timestamp(cue.start)
+        if previous_start is None or cue_start - previous_start > 15:
+            previous_words = []
         previous_norm = [word.lower().strip('.,;:!?¿¡()[]{}"') for word in previous_words]
         words_norm = [word.lower().strip('.,;:!?¿¡()[]{}"') for word in words]
         if words_norm == previous_norm or (previous_norm and previous_norm[-len(words_norm) :] == words_norm):
+            previous_start = cue_start
             continue
         # Remove overlap between previous tail and current head, ignoring punctuation/case.
         overlap = 0
@@ -121,6 +124,7 @@ def remove_rolling_overlaps(cues: list[Cue]) -> list[Cue]:
             result.append(Cue(cue.start, " ".join(new_words)))
             previous_words.extend(new_words)
             previous_words = previous_words[-80:]
+        previous_start = cue_start
     return result
 
 
@@ -135,19 +139,20 @@ def chunk_by_minutes(cues: list[Cue], minutes: int = 5) -> list[tuple[str, str, 
         return []
     size = minutes * 60
     chunks: list[tuple[str, str, str]] = []
-    bucket_start = (seconds_from_timestamp(cues[0].start) // size) * size
+    bucket_start: int | None = None
     bucket: list[str] = []
 
     for cue in cues:
         sec = seconds_from_timestamp(cue.start)
-        while sec >= bucket_start + size and bucket:
+        cue_bucket_start = (sec // size) * size
+        if bucket_start is not None and cue_bucket_start != bucket_start:
             chunks.append(
                 (timestamp_from_seconds(bucket_start), timestamp_from_seconds(bucket_start + size), " ".join(bucket))
             )
             bucket = []
-            bucket_start += size
+        bucket_start = cue_bucket_start
         bucket.append(cue.text)
-    if bucket:
+    if bucket and bucket_start is not None:
         chunks.append(
             (timestamp_from_seconds(bucket_start), timestamp_from_seconds(bucket_start + size), " ".join(bucket))
         )

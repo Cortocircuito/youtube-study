@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
+import pytest
+
 from src.youtube_study.downloader import SubtitleSelection
+from src.youtube_study.errors import VideoDataError
 from src.youtube_study.service import analyze_existing, export_study, generate_study_files
 
 
@@ -146,3 +150,66 @@ def test_export_study_recomputes_markdown_and_anki_from_subtitle(tmp_path: Path)
     assert "https://youtu.be/demo?si=share&t=1" in study
     assert "https://youtu.be/demo?si=share&amp;t=1" in anki
     assert "video::demo" in anki
+
+
+def test_empty_subtitle_does_not_overwrite_existing_artifacts(tmp_path: Path) -> None:
+    video_dir = tmp_path / "videos" / "demo"
+    video_dir.mkdir(parents=True)
+    subtitle_path = video_dir / "demo.es.vtt"
+    subtitle_path.write_text("WEBVTT\n\n", encoding="utf-8")
+    summary_path = video_dir / "summary.md"
+    summary_path.write_text("resultado válido", encoding="utf-8")
+    selection = SubtitleSelection(subtitle_path, "es", "manual", "test")
+
+    with pytest.raises(VideoDataError, match="no contiene texto utilizable"):
+        generate_study_files({"id": "demo"}, video_dir, selection, tmp_path / "library.json")
+
+    assert summary_path.read_text(encoding="utf-8") == "resultado válido"
+    assert not (video_dir / "info.json").exists()
+
+
+def test_writer_failure_does_not_publish_partial_generation(monkeypatch, tmp_path: Path) -> None:
+    video_dir = tmp_path / "videos" / "demo"
+    video_dir.mkdir(parents=True)
+    subtitle_path = video_dir / "demo.es.vtt"
+    write_demo_vtt(subtitle_path)
+    summary_path = video_dir / "summary.md"
+    summary_path.write_text("resultado anterior", encoding="utf-8")
+    selection = SubtitleSelection(subtitle_path, "es", "manual", "test")
+
+    def fail_writer(*args, **kwargs) -> None:
+        raise OSError("sin espacio")
+
+    monkeypatch.setattr("src.youtube_study.service.write_summary", fail_writer)
+
+    with pytest.raises(OSError, match="sin espacio"):
+        generate_study_files({"id": "demo"}, video_dir, selection, tmp_path / "library.json")
+
+    assert summary_path.read_text(encoding="utf-8") == "resultado anterior"
+    assert not (video_dir / "info.json").exists()
+
+
+def test_publish_failure_restores_previous_generation(monkeypatch, tmp_path: Path) -> None:
+    video_dir = tmp_path / "videos" / "demo"
+    video_dir.mkdir(parents=True)
+    subtitle_path = video_dir / "demo.es.vtt"
+    write_demo_vtt(subtitle_path)
+    summary_path = video_dir / "summary.md"
+    summary_path.write_text("resultado anterior", encoding="utf-8")
+    selection = SubtitleSelection(subtitle_path, "es", "manual", "test")
+    original_replace = os.replace
+
+    def fail_while_publishing(source, destination) -> None:
+        source_path = Path(source)
+        if source_path.name == "summary.md" and ".staging-" in source_path.parent.name:
+            raise OSError("fallo de publicación")
+        original_replace(source, destination)
+
+    monkeypatch.setattr("src.youtube_study.service.os.replace", fail_while_publishing)
+
+    with pytest.raises(OSError, match="fallo de publicación"):
+        generate_study_files({"id": "demo"}, video_dir, selection, tmp_path / "library.json")
+
+    assert summary_path.read_text(encoding="utf-8") == "resultado anterior"
+    assert not (video_dir / "info.json").exists()
+    assert not list(video_dir.parent.glob(".demo.backup-*"))
