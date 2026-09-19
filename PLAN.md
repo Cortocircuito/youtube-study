@@ -14,15 +14,15 @@ La aplicación funciona localmente sin Ollama y permite:
 - Publicar generaciones y exportaciones desde staging mediante reemplazos atómicos por archivo y reintento explícito.
 - Leer la biblioteca sin efectos secundarios y reconstruir índices dañados explícitamente con respaldo mediante `rebuild-library`.
 - Validar cambios mediante Ruff, compilación, pytest y GitHub Actions.
-- Medir cobertura de ramas en CI sin imponer todavía un umbral. La referencia local actual es 87 %, incluyendo los subprocesos de las pruebas funcionales de CLI.
+- Medir cobertura de ramas en CI sin imponer todavía un umbral. La referencia local actual es 91 %, incluyendo los subprocesos de las pruebas funcionales de CLI.
 
 ## Prioridades próximas sin IA
 
 1. Completar la anotación humana de la muestra local de videos largos descrita en `QUALITY.md`.
-2. Ampliar las ramas cubiertas de descarga y fallos de publicación antes de decidir si conviene fijar un umbral.
-3. Mejorar filtros de biblioteca por canal, herramienta, tema y estado de estudio.
-4. Reforzar reintentos ante fallos temporales de descarga sin sobrescribir resultados válidos.
-5. Mejorar la separación de párrafos con fixtures variados sin reducir la fidelidad extractiva.
+2. Mejorar filtros de biblioteca por canal, herramienta, tema y estado de estudio.
+3. Reforzar reintentos ante fallos temporales de descarga sin sobrescribir resultados válidos.
+4. Mejorar la separación de párrafos con fixtures variados sin reducir la fidelidad extractiva.
+5. Ampliar ramas restantes de biblioteca y metadata antes de decidir si conviene fijar un umbral.
 
 La fase inicial de evaluación ya dispone de objetivos manuales sobre fixtures sanitizados, métricas direccionales y una muestra local de videos largos pendiente de anotación humana. Esta muestra no participa en CI ni convierte resultados generados en referencias de calidad.
 
@@ -31,6 +31,8 @@ La segunda fase reconstruye unidades legibles desde cues fragmentados, conserva 
 La tercera fase extrae conceptos de una a tres palabras, puntúa frecuencia, distribución y asociación, elimina variantes redundantes y alinea `concepts.md`, `concepts.json` y la sección correspondiente de `study.md`. El formato de análisis v3 permite regenerar estos artefactos desde subtítulos locales.
 
 La cuarta fase formula una sola pregunta básica por evidencia explicativa, usa temas prácticos breves en orden textual y reserva las preguntas de comprensión para causas o condiciones explícitas. El corpus sanitizado alcanza precisión, recall y F1 de preguntas completos para sus objetivos revisados; la métrica v3 exige además timestamp correcto y emparejamiento uno a uno.
+
+La quinta fase cubre errores de `yt-dlp`, metadata incompleta, fallbacks de subtítulos, validación previa de staging, limpieza temporal y orquestación de `process_video`, siempre sin red. `downloader.py`, `artifacts.py` y `service.py` alcanzan 98 % de cobertura combinada y la suite completa alcanza 91 %, sin requerir cambios de producción.
 
 ## Posibles mejoras posteriores
 

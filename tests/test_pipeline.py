@@ -9,7 +9,13 @@ import pytest
 from src.youtube_study.downloader import SubtitleSelection
 from src.youtube_study.errors import ArtifactPublicationError, VideoDataError
 from src.youtube_study.models import VideoMetadata
-from src.youtube_study.service import analyze_existing, export_study, generate_study_files
+from src.youtube_study.service import (
+    analyze_existing,
+    export_study,
+    generate_study_files,
+    load_existing_video,
+    process_video,
+)
 
 ARTIFACT_NAMES = {
     "info.json",
@@ -368,3 +374,89 @@ def test_library_failure_happens_after_complete_generation_is_published(monkeypa
 
     assert ARTIFACT_NAMES.issubset({path.name for path in video_dir.iterdir()})
     assert library_path.read_bytes() == previous_library
+
+
+def test_process_video_passes_download_options_and_generates_selected_video(monkeypatch, tmp_path: Path) -> None:
+    out = tmp_path / "videos"
+    video_dir = out / "demo"
+    selection = SubtitleSelection(video_dir / "demo.es.vtt", "es", "manual", "test")
+    calls: dict[str, object] = {}
+
+    def fake_download(
+        url: str,
+        target: Path,
+        languages: str,
+        *,
+        force_download: bool,
+        quiet: bool,
+    ) -> dict[str, object]:
+        calls["download"] = (url, target, languages, force_download, quiet)
+        return {
+            "id": "demo",
+            "title": "Demo",
+            "uploader": "Canal",
+            "duration": 125,
+            "webpage_url": "https://example.test/demo",
+        }
+
+    def fake_choose(
+        target: Path,
+        video_id: str,
+        languages: list[str],
+        info: dict[str, object] | None = None,
+    ) -> SubtitleSelection:
+        calls["choose"] = (target, video_id, languages, info)
+        return selection
+
+    def fake_generate(
+        metadata: VideoMetadata,
+        target: Path,
+        selected: SubtitleSelection,
+        library_path: Path,
+    ) -> Path:
+        calls["generate"] = (metadata, target, selected, library_path)
+        return target
+
+    monkeypatch.setattr("src.youtube_study.service.download_subtitles", fake_download)
+    monkeypatch.setattr("src.youtube_study.service.choose_subtitle", fake_choose)
+    monkeypatch.setattr("src.youtube_study.service.generate_study_files", fake_generate)
+
+    result = process_video(
+        "https://example.test/demo",
+        out,
+        "es-419, es",
+        force_download=True,
+        quiet=True,
+    )
+
+    assert result == video_dir
+    assert calls["download"] == ("https://example.test/demo", out, "es-419, es", True, True)
+    downloaded_info = {
+        "id": "demo",
+        "title": "Demo",
+        "uploader": "Canal",
+        "duration": 125,
+        "webpage_url": "https://example.test/demo",
+    }
+    assert calls["choose"] == (video_dir, "demo", ["es-419", "es"], downloaded_info)
+    generated = calls["generate"]
+    assert isinstance(generated, tuple)
+    assert generated[0] == VideoMetadata(
+        id="demo",
+        title="Demo",
+        uploader="Canal",
+        duration=125,
+        webpage_url="https://example.test/demo",
+    )
+    assert generated[1:] == (video_dir, selection, tmp_path / "library.json")
+
+
+def test_load_existing_video_reports_missing_directory_and_info(tmp_path: Path) -> None:
+    out = tmp_path / "videos"
+
+    with pytest.raises(VideoDataError, match="No existe el directorio"):
+        load_existing_video("missing", out, "es")
+
+    (out / "demo").mkdir(parents=True)
+    with pytest.raises(VideoDataError, match="No existe info.json"):
+        load_existing_video("demo", out, "es")
