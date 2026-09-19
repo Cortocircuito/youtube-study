@@ -36,7 +36,7 @@ El reporte usa promedio macro para que un dominio no oculte otro. También compa
 
 ## Línea base
 
-`tests/fixtures/quality_baseline.v1.json` registra el comportamiento previo a las mejoras. No representa un objetivo aceptable: actualmente expone una tasa de violación de ruido de `1.0` y baja precisión de preguntas. Su función es impedir regresiones mientras permite mejorar cualquier métrica. Un hash enlaza el baseline con el JSON del corpus y los VTT exactos para impedir comparaciones entre revisiones diferentes.
+`tests/fixtures/quality_baseline.v1.json` registra el mejor comportamiento revisado hasta el momento. No representa un objetivo final: actualmente expone una tasa macro de violación de ruido de `0.75` y baja precisión de preguntas. Su función es impedir regresiones mientras permite mejorar cualquier métrica. Un hash enlaza el baseline con el JSON del corpus y los VTT exactos para impedir comparaciones entre revisiones diferentes.
 
 Para inspeccionar el reporte actual:
 
@@ -53,6 +53,14 @@ python -m pytest tests/test_quality.py tests/test_quality_corpus.py
 El baseline sólo debe actualizarse después de revisar el diff del reporte y confirmar que el cambio es una mejora real. Las métricas positivas no pueden bajar y las negativas no pueden subir.
 
 Los `question_targets` forman el conjunto cerrado de preguntas consideradas útiles para cada fixture. Deben anotar todas las formulaciones pedagógicamente aceptables mediante grupos de aliases. Una pregunta nueva que sea válida pero no coincida exige revisar las anotaciones antes de interpretar el cambio de precisión.
+
+## Reconstrucción y ruido
+
+El análisis reconstruye unidades textuales desde cues incompletos antes de seleccionar ideas. Cada unidad conserva los rangos exactos de todos sus cues, no añade puntuación y se cierra al encontrar puntuación terminal, un salto temporal o un límite de seguridad.
+
+El filtro de ruido sólo afecta al material de estudio. Los cues originales permanecen en `AnalysisResult` y en las transcripciones exportadas. Para reducir falsos positivos, una unidad sólo se descarta cuando combina varias señales de producción, por ejemplo promoción explícita del canal, revisión de audio o una transición vacía. Las muletillas aisladas se penalizan durante la selección, pero no se eliminan ni se reescriben.
+
+Después de esta fase, `noisy_energy.noise_rule_violation_rate` es `0.0`. Los otros casos todavía penalizan temas genéricos en preguntas; su mejora corresponde a la fase específica de generación de preguntas.
 
 ## Evaluación de videos largos
 

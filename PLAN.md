@@ -26,6 +26,8 @@ La aplicación funciona localmente sin Ollama y permite:
 
 La fase inicial de evaluación ya dispone de objetivos manuales sobre fixtures sanitizados, métricas direccionales y una muestra local de videos largos pendiente de anotación humana. Esta muestra no participa en CI ni convierte resultados generados en referencias de calidad.
 
+La segunda fase reconstruye unidades legibles desde cues fragmentados, conserva evidencia exacta y filtra ruido inequívoco sólo en el material de estudio. El caso ruidoso del corpus ya no presenta violaciones; quedan pendientes los temas genéricos de preguntas y la anotación manual de videos largos.
+
 ## Posibles mejoras posteriores
 
 - Exportación PDF.

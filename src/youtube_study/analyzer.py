@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from dataclasses import dataclass
 
 from .study_models import ANALYSIS_FORMAT_VERSION as _ANALYSIS_FORMAT_VERSION
 from .study_models import (
@@ -16,6 +15,7 @@ from .study_models import (
     ToolMention,
     flatten_questions,
 )
+from .text_units import TextUnit, pack_units, sentence_units
 from .tool_catalog import TOOL_CATALOG, UNKNOWN_CANDIDATE_EXCLUSIONS
 from .transcript import Cue, chunk_by_minutes, normalize_aliases, seconds_from_timestamp
 
@@ -34,18 +34,10 @@ STOPWORDS = set(
 )
 
 
-@dataclass(frozen=True)
-class TextWindow:
-    evidence: SourceExcerpt
-    position: int
+TextWindow = TextUnit
 
-    @property
-    def timestamp(self) -> str:
-        return self.evidence.timestamp
-
-    @property
-    def text(self) -> str:
-        return self.evidence.text
+STAGE_DIRECTION = re.compile(r"\[(?:música|musica|aplausos?|risas?|silencio)\]", re.IGNORECASE)
+WORD_PATTERN = re.compile(r"[a-záéíóúñü0-9]+", re.IGNORECASE)
 
 
 def full_text(cues: list[Cue]) -> str:
@@ -126,10 +118,11 @@ def content_tokens(text: str) -> set[str]:
     return {word.strip(".-_") for word in words if word.strip(".-_") not in STOPWORDS and not word.isdigit()}
 
 
-def semantic_markers(text: str) -> tuple[set[str], set[str]]:
+def semantic_markers(text: str) -> tuple[set[str], set[str], set[str]]:
     words = set(re.findall(r"\b(?:no|sin|nunca|jamás|tampoco|ni)\b", text.lower()))
     numbers = set(re.findall(r"\b\d+(?:[.,]\d+)?\b", text))
-    return words, numbers
+    repetitions = {match.group(1) for match in re.finditer(r"\b([a-záéíóúñü]+)\b(?:\s*[,;:]\s*|\s+)\1\b", text.lower())}
+    return words, numbers, repetitions
 
 
 def token_similarity(left: str, right: str) -> float:
@@ -151,18 +144,62 @@ def deduplicate_texts(texts: list[str], threshold: float = 0.72) -> list[str]:
     return unique
 
 
-def source_excerpt_from_cues(indexed_cues: list[tuple[int, Cue]]) -> SourceExcerpt:
-    fragments = tuple(
-        SourceFragment(
-            cue_index=cue_index,
-            timestamp=cue.start,
-            start=0,
-            end=len(cue.text),
-            text=cue.text,
-        )
-        for cue_index, cue in indexed_cues
+def is_obvious_noise(text: str) -> bool:
+    """Identify short production noise using multiple signals to avoid domain false positives."""
+    lower = re.sub(r"\s+", " ", text.lower()).strip()
+    without_stage = STAGE_DIRECTION.sub("", lower)
+    if not WORD_PATTERN.search(without_stage):
+        return True
+    if len(WORD_PATTERN.findall(lower)) > 28:
+        return False
+
+    stage_residual = STAGE_DIRECTION.sub("", lower)
+    stage_residual = re.sub(r"\b(?:bueno|ahora sí|comenzamos|empezamos|comenzar|empezar)\b", "", stage_residual)
+    stage_intro = bool(STAGE_DIRECTION.search(lower)) and len(WORD_PATTERN.findall(stage_residual)) <= 1
+    promotion = (
+        bool(re.search(r"\b(?:recuerd\w*|no olvid\w*)\b", lower))
+        and bool(re.search(r"\bsuscrib\w*\b", lower))
+        and "al canal" in lower
+        and bool(re.search(r"\bactivar las notificaciones?\b", lower))
     )
-    return SourceExcerpt(" ".join(fragment.text for fragment in fragments), fragments)
+    production_issue = (
+        bool(re.search(r"\b(?:esperen|espera(?:d)?|un momento)\b", lower))
+        and bool(re.search(r"\b(?:revisar|probar|comprobar)\b", lower))
+        and bool(re.search(r"\b(?:sonido|audio|micrófono|microfono)\b", lower))
+    )
+    empty_transition = bool(re.search(r"\b(?:creo que se entiende|no sé)\b", lower)) and bool(
+        re.search(r"\b(?:seguimos con otra cosa|pasamos a otra cosa)\b", lower)
+    )
+    return stage_intro or promotion or production_issue or empty_transition
+
+
+def filler_penalty(text: str) -> float:
+    lower = text.lower()
+    hits = len(re.findall(r"\b(?:eh|em|mmm+)\b", lower))
+    hits += len(re.findall(r"\bbueno\s*[,;:]?\s+bueno\b", lower))
+    hits += len(re.findall(r"(?:^|\b(?:eh|bueno)\s*[,;:]?\s+)a ver\s*[,;:]", lower))
+    return min(4.0, hits * 1.25)
+
+
+def informative_units(cues: list[Cue]) -> list[TextUnit]:
+    return [unit for unit in sentence_units(cues) if not is_obvious_noise(unit.text)]
+
+
+def deduplicate_units(units: list[TextUnit]) -> list[TextUnit]:
+    unique: list[TextUnit] = []
+    for unit in units:
+        if any(
+            abs(seconds_from_timestamp(unit.timestamp) - seconds_from_timestamp(previous.timestamp)) <= 15
+            and token_similarity(unit.text, previous.text) >= 0.72
+            for previous in unique[-8:]
+        ):
+            continue
+        unique.append(unit)
+    return unique
+
+
+def selectable_units(cues: list[Cue]) -> list[TextUnit]:
+    return deduplicate_units(informative_units(cues))
 
 
 def slice_source_excerpt(evidence: SourceExcerpt, text: str) -> SourceExcerpt:
@@ -195,23 +232,8 @@ def slice_source_excerpt(evidence: SourceExcerpt, text: str) -> SourceExcerpt:
 
 
 def cue_windows(cues: list[Cue], size: int = 3) -> list[TextWindow]:
-    """Build chronological, non-overlapping windows while dropping near-duplicate cues."""
-    unique_cues: list[tuple[int, Cue]] = []
-    for cue_index, cue in enumerate(cues):
-        if any(
-            abs(seconds_from_timestamp(cue.start) - seconds_from_timestamp(previous.start)) <= 15
-            and token_similarity(cue.text, previous.text) >= 0.72
-            for _, previous in unique_cues[-8:]
-        ):
-            continue
-        unique_cues.append((cue_index, cue))
-
-    windows: list[TextWindow] = []
-    for index in range(0, len(unique_cues), size):
-        chunk = unique_cues[index : index + size]
-        if chunk:
-            windows.append(TextWindow(source_excerpt_from_cues(chunk), index))
-    return windows
+    """Build readable windows while dropping noise and near-duplicate units."""
+    return pack_units(selectable_units(cues), size=size)
 
 
 def text_score(text: str, frequencies: dict[str, int], position: int = 0) -> float:
@@ -222,7 +244,7 @@ def text_score(text: str, frequencies: dict[str, int], position: int = 0) -> flo
     length_score = min(len(words), 60) / 60
     position_bonus = 1 / (position + 2)
     short_penalty = 3 if len(words) < 10 else 0
-    return keyword_weight + density * 3 + length_score + position_bonus - short_penalty
+    return keyword_weight + density * 3 + length_score + position_bonus - short_penalty - filler_penalty(text)
 
 
 def representative_sentences(text: str, limit: int = 3) -> list[str]:
@@ -240,9 +262,10 @@ def representative_sentences(text: str, limit: int = 3) -> list[str]:
     return [sentence for _, sentence in chosen]
 
 
-def important_ideas(cues: list[Cue], limit: int = 12) -> list[StudyIdea]:
-    windows = cue_windows(cues)
-    frequencies = dict(keywords(full_text(cues), 25))
+def important_ideas(cues: list[Cue], limit: int = 12, units: list[TextUnit] | None = None) -> list[StudyIdea]:
+    units = informative_units(cues) if units is None else units
+    windows = pack_units(deduplicate_units(units))
+    frequencies = dict(keywords(" ".join(unit.text for unit in units), 25))
     scored = [(text_score(window.text, frequencies, window.position), window) for window in windows]
 
     selected: list[TextWindow] = []
@@ -255,17 +278,21 @@ def important_ideas(cues: list[Cue], limit: int = 12) -> list[StudyIdea]:
     return [StudyIdea(window.evidence) for window in sorted(selected, key=lambda item: item.position)]
 
 
-def section_summaries(cues: list[Cue], minutes: int = 5) -> list[tuple[str, str, list[str]]]:
+def section_summaries(
+    cues: list[Cue], minutes: int = 5, units: list[TextUnit] | None = None
+) -> list[tuple[str, str, list[str]]]:
+    units = informative_units(cues) if units is None else units
+    analysis_cues = [Cue(unit.timestamp, unit.text) for unit in units]
     sections = []
-    for start, end, text in chunk_by_minutes(cues, minutes):
+    for start, end, text in chunk_by_minutes(analysis_cues, minutes):
         kws = [word for word, _ in keywords(text, 8)]
         ideas = representative_sentences(text)
         sections.append((f"{start} - {end}", ", ".join(kws[:5]), ideas))
     return sections
 
 
-def concept_mentions(cues: list[Cue], limit: int = 20) -> list[ConceptMention]:
-    text = full_text(cues)
+def concept_mentions(cues: list[Cue], limit: int = 20, text: str | None = None) -> list[ConceptMention]:
+    text = full_text(cues) if text is None else text
     top = keywords(text, limit)
     concepts: list[ConceptMention] = []
     for word, count in top:
@@ -281,9 +308,10 @@ def concept_mentions(cues: list[Cue], limit: int = 20) -> list[ConceptMention]:
     return sorted(concepts, key=lambda item: item.score, reverse=True)
 
 
-def source_excerpt_for_term(cues: list[Cue], term: str) -> SourceExcerpt | None:
+def source_excerpt_for_term(cues: list[Cue], term: str, units: list[TextUnit] | None = None) -> SourceExcerpt | None:
     pattern = re.compile(r"(?<![\w.-])" + re.escape(term) + r"(?![\w.-])", re.IGNORECASE)
-    matches = [(cue_index, cue) for cue_index, cue in enumerate(cues) if pattern.search(cue.text)]
+    units = informative_units(cues) if units is None else units
+    matches = [unit for unit in units if pattern.search(unit.text)]
     if not matches:
         return None
     explanation = re.compile(
@@ -293,12 +321,12 @@ def source_excerpt_for_term(cues: list[Cue], term: str) -> SourceExcerpt | None:
     selected = max(
         enumerate(matches),
         key=lambda item: (
-            bool(explanation.search(item[1][1].text)),
-            len(content_tokens(item[1][1].text)),
+            bool(explanation.search(item[1].text)),
+            len(content_tokens(item[1].text)),
             -item[0],
         ),
     )[1]
-    return source_excerpt_from_cues([selected])
+    return selected.evidence
 
 
 def question_key(question: str) -> str:
@@ -343,6 +371,7 @@ def questions(
     concepts: list[ConceptMention],
     ideas: list[StudyIdea],
     limit: int = 10,
+    units: list[TextUnit] | None = None,
 ) -> dict[str, list[StudyQuestion]]:
     groups: dict[str, list[StudyQuestion]] = {"basicas": [], "comprension": [], "practicas": []}
     seen: set[str] = set()
@@ -356,7 +385,7 @@ def questions(
 
     used_topics: set[str] = set()
     for tool in tools[:4]:
-        evidence = source_excerpt_for_term(cues, tool.name)
+        evidence = source_excerpt_for_term(cues, tool.name, units)
         if evidence:
             add("basicas", f"¿Qué se explica sobre {tool.name}?", evidence)
             used_topics.add(tool.name.lower())
@@ -366,7 +395,7 @@ def questions(
             break
         if concept.name in used_topics or concept.name in QUESTION_TOPIC_EXCLUSIONS:
             continue
-        evidence = source_excerpt_for_term(cues, concept.name)
+        evidence = source_excerpt_for_term(cues, concept.name, units)
         if evidence:
             add("basicas", f"¿Qué se explica sobre {concept.name}?", evidence)
             used_topics.add(concept.name)
@@ -411,17 +440,18 @@ def flashcards(tools: list[ToolMention], qs: dict[str, list[StudyQuestion]]) -> 
 
 
 def analyze_cues(cues: list[Cue]) -> AnalysisResult:
-    text = full_text(cues)
+    units = informative_units(cues)
+    text = " ".join(unit.text for unit in units)
     tools = detect_tools(text)
-    ideas = important_ideas(cues)
-    concepts = concept_mentions(cues)
-    qs = questions(cues, tools, concepts, ideas)
+    ideas = important_ideas(cues, units=units)
+    concepts = concept_mentions(cues, text=text)
+    qs = questions(cues, tools, concepts, ideas, units=units)
     return AnalysisResult(
         cues=cues,
         keywords=keywords(text),
         tools=tools,
         ideas=ideas,
-        sections=section_summaries(cues),
+        sections=section_summaries(cues, units=units),
         concepts=concepts,
         questions=qs,
         cards=flashcards(tools, qs),

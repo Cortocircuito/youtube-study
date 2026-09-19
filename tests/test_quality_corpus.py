@@ -91,8 +91,10 @@ def test_quality_report_preserves_extract_source_invariants() -> None:
 
 def test_current_quality_does_not_regress_from_versioned_baseline() -> None:
     report = evaluate_quality_corpus(load_quality_corpus(CORPUS_PATH))
+    noisy = next(case for case in report.cases if case.id == "noisy_energy")
 
     assert baseline_regressions(report, BASELINE_PATH) == []
+    assert noisy.metrics.noise_rule_violation_rate == 0.0
     assert set(report.macro.__dataclass_fields__) == POSITIVE_METRICS | NEGATIVE_METRICS
     assert all(0.0 <= value <= 1.0 for value in report.macro.__dict__.values())
 

@@ -5,7 +5,8 @@ Aplicación local para estudiar videos de YouTube a partir de sus subtítulos, s
 ## Qué hace
 
 - Descarga subtítulos con `yt-dlp` y elige de forma preferente español manual, español automático original, traducción solicitada, inglés y un fallback controlado.
-- Limpia subtítulos VTT y elimina solapamientos cercanos de captions automáticos sin reescribir el texto fuente.
+- Limpia subtítulos VTT, elimina solapamientos cercanos y reconstruye unidades legibles conservando los rangos exactos del texto fuente.
+- Excluye del material de estudio ruido inequívoco de producción y penaliza muletillas sin borrar contenido de la transcripción.
 - Genera resúmenes extractivos deduplicados, conceptos, preguntas respondidas, flashcards, guía de estudio, un Markdown consolidado y CSV para Anki.
 - Conserva la procedencia exacta de las respuestas por fragmento y añade referencias al instante del video en resúmenes, preguntas, tarjetas y Anki.
 - Mantiene una biblioteca local y permite listar, consultar, buscar, reanalizar y exportar videos.
