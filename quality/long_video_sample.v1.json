@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "status": "pending_human_annotation",
+  "selection_note": "La biblioteca local disponible es mayoritariamente tecnológica; el dominio alternativo está cubierto por fixtures sanitizados hasta incorporar un video largo apropiado.",
+  "videos": [
+    {
+      "id": "yOhwBdUbRuU",
+      "title": "Curso de IA #3 - Memoria y Contexto",
+      "duration_seconds": 8624,
+      "profile": "curso_estructurado",
+      "subtitle_kind": "automatic",
+      "reference": {"topics": [], "essential_ideas": []}
+    },
+    {
+      "id": "FQ0fAIMoyPg",
+      "title": "Curso de Claude Code para Desarrolladores en VIVO",
+      "duration_seconds": 14856,
+      "profile": "directo_ruidoso",
+      "subtitle_kind": "automatic",
+      "reference": {"topics": [], "essential_ideas": []}
+    },
+    {
+      "id": "i5SuSvP0gZo",
+      "title": "Tengo algo MUY importante que contarles",
+      "duration_seconds": 9627,
+      "profile": "contenido_mixto",
+      "subtitle_kind": "automatic",
+      "reference": {"topics": [], "essential_ideas": []}
+    }
+  ]
+}

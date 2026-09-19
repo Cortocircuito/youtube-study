@@ -107,6 +107,8 @@ El formato de análisis actual es **v2**. Las preguntas y flashcards contienen u
 
 ## Desarrollo
 
+La evaluación heurística usa un corpus sanitizado y una línea base versionada. Consulta [`QUALITY.md`](QUALITY.md) para conocer las métricas, inspeccionar el reporte y añadir casos sin usar datos reales ni red en CI.
+
 Validación completa:
 
 ```bash

@@ -18,11 +18,13 @@ La aplicación funciona localmente sin Ollama y permite:
 
 ## Prioridades próximas sin IA
 
-1. Mejorar puntuación y separación de párrafos con más fixtures de subtítulos automáticos reales y sanitizados.
+1. Usar el corpus y baseline de `QUALITY.md` para mejorar puntuación, ruido y separación de párrafos sin regresiones.
 2. Ampliar las ramas cubiertas de descarga y fallos de publicación antes de decidir si conviene fijar un umbral.
 3. Mejorar filtros de biblioteca por canal, herramienta, tema y estado de estudio.
 4. Reforzar reintentos ante fallos temporales de descarga sin sobrescribir resultados válidos.
 5. Evaluar conceptos compuestos sin reducir la fidelidad extractiva del análisis.
+
+La fase inicial de evaluación ya dispone de objetivos manuales sobre fixtures sanitizados, métricas direccionales y una muestra local de videos largos pendiente de anotación humana. Esta muestra no participa en CI ni convierte resultados generados en referencias de calidad.
 
 ## Posibles mejoras posteriores
 
