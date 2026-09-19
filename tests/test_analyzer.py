@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from src.youtube_study.analyzer import (
     analyze_cues,
     concept_mentions,
@@ -9,6 +11,7 @@ from src.youtube_study.analyzer import (
     filler_penalty,
     informative_units,
     is_obvious_noise,
+    question_topic,
     selectable_units,
     source_excerpt_for_term,
     token_similarity,
@@ -277,3 +280,112 @@ def test_basic_question_prefers_an_explanatory_mention() -> None:
     question = next(item for item in result.questions["basicas"] if "ssh" in item.question.lower())
     assert question.answer == explanation
     assert question.timestamp == "00:00:10"
+
+
+def test_basic_questions_use_distinct_explanatory_evidence() -> None:
+    result = analyze_cues(
+        [
+            Cue("00:00:01", "Un medidor enchufable registra la potencia y el consumo acumulado del aparato."),
+            Cue("00:00:10", "El aislamiento reduce la pérdida de calor de la vivienda."),
+        ]
+    )
+
+    questions = result.questions["basicas"]
+
+    assert any("medidor enchufable" in item.question for item in questions)
+    assert len({item.evidence.fragments for item in questions}) == len(questions)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "En una base de datos, un índice acelera las consultas repetidas.",
+        "En una base de datos un índice acelera las consultas repetidas.",
+    ],
+)
+def test_basic_question_prefers_the_subject_nearest_to_the_relation(text: str) -> None:
+    result = analyze_cues([Cue("00:00:01", text), Cue("00:00:10", "Después revisaremos el índice.")])
+
+    assert result.questions["basicas"][0].question == "¿Qué se explica sobre índice?"
+
+
+@pytest.mark.parametrize(
+    ("text", "topic"),
+    [
+        ("Configurar alertas permite detectar errores críticos.", "alertas"),
+        ("Comparar métricas permite detectar regresiones.", "comparar métricas"),
+        ("Conectar servicios permite compartir datos.", "servicios"),
+    ],
+)
+def test_basic_question_does_not_use_a_bare_leading_infinitive(text: str, topic: str) -> None:
+    result = analyze_cues([Cue("00:00:01", text)])
+
+    assert result.questions["basicas"][0].question == f"¿Qué se explica sobre {topic}?"
+
+
+def test_tool_questions_require_explanation_and_distinct_evidence() -> None:
+    result = analyze_cues(
+        [
+            Cue("00:00:01", "Hoy mencionaremos SSH y Tailscale durante el recorrido."),
+            Cue("00:00:10", "SSH y Tailscale permiten acceder a la red privada."),
+        ]
+    )
+
+    assert len(result.questions["basicas"]) == 1
+    assert result.questions["basicas"][0].timestamp == "00:00:10"
+
+
+def test_practical_topic_keeps_a_short_specific_phrase() -> None:
+    assert (
+        question_topic("Programar el termostato evita calentar la vivienda cuando está vacía.")
+        == "programar termostato"
+    )
+    assert question_topic("Primero conviene sellar ventanas y puertas antes de cambiar la calefacción.") == (
+        "sellar ventanas puertas"
+    )
+    assert question_topic("Antes de optimizar una base de datos hay que medir consultas lentas.") == (
+        "optimizar base datos"
+    )
+
+
+def test_comprehension_questions_require_an_explicit_non_practical_cause() -> None:
+    result = analyze_cues(
+        [Cue("00:00:01", "La caché reduce la latencia porque conserva respuestas frecuentes en memoria.")]
+    )
+
+    assert [item.question for item in result.questions["comprension"]] == [
+        "¿Por qué se afirma que la caché reduce la latencia?"
+    ]
+    assert result.questions["comprension"][0].timestamp == "00:00:01"
+
+
+def test_causal_effect_does_not_turn_an_explanation_into_a_recommendation() -> None:
+    result = analyze_cues([Cue("00:00:01", "El cifrado es importante porque evita accesos no autorizados.")])
+
+    assert result.questions["practicas"] == []
+    assert result.questions["comprension"][0].question == "¿Por qué se afirma que el cifrado es importante?"
+
+
+def test_conditional_effect_does_not_turn_an_explanation_into_a_recommendation() -> None:
+    result = analyze_cues([Cue("00:00:01", "El aislamiento funciona cuando evita puentes térmicos en la vivienda.")])
+
+    assert result.questions["practicas"] == []
+    assert result.questions["comprension"][0].question == ("¿En qué situación se afirma que el aislamiento funciona?")
+
+
+def test_comprehension_question_preserves_leading_acronyms() -> None:
+    examples = [
+        ("SSH resulta útil porque protege la conexión remota.", "SSH"),
+        ("GitHub resulta útil porque centraliza la revisión del código.", "GitHub"),
+        ("Node.js resulta útil porque ejecuta JavaScript fuera del navegador.", "Node.js"),
+    ]
+
+    for text, name in examples:
+        result = analyze_cues([Cue("00:00:01", text)])
+        assert result.questions["comprension"][0].question.startswith(f"¿Por qué se afirma que {name} ")
+
+
+def test_generic_idea_windows_do_not_create_comprehension_questions() -> None:
+    result = analyze_cues([Cue("00:00:01", "El panel presenta métricas útiles para revisar el servicio.")])
+
+    assert result.questions["comprension"] == []

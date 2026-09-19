@@ -1,7 +1,7 @@
 {
-  "metric_version": 2,
+  "metric_version": 3,
   "corpus_schema_version": 2,
-  "corpus_digest": "da3b8324662a231c5f5bb0a9962241df854811f138ed2eba4671366ec2d033ec",
+  "corpus_digest": "89aa98ead4517b7cbabb5aeb217a84560eb71daf7cf43b771e3018b9ea005f68",
   "analysis_format_version": 3,
   "cases": {
     "gardening": {
@@ -15,14 +15,14 @@
         "concept_timestamp_recall": 1.0,
         "concept_precision": 1.0,
         "concept_redundancy_rate": 0.0,
-        "noise_rule_violation_rate": 1.0,
+        "noise_rule_violation_rate": 0.0,
         "summary_duplicate_rate": 0.0,
-        "useful_question_precision": 0.3,
+        "useful_question_precision": 1.0,
         "useful_question_recall": 1.0,
-        "useful_question_f1": 0.461538
+        "useful_question_f1": 1.0
       },
       "idea_count": 3,
-      "question_count": 10,
+      "question_count": 5,
       "concept_count": 15
     },
     "databases": {
@@ -36,14 +36,14 @@
         "concept_timestamp_recall": 1.0,
         "concept_precision": 0.933333,
         "concept_redundancy_rate": 0.0,
-        "noise_rule_violation_rate": 1.0,
+        "noise_rule_violation_rate": 0.0,
         "summary_duplicate_rate": 0.0,
-        "useful_question_precision": 0.3,
+        "useful_question_precision": 1.0,
         "useful_question_recall": 1.0,
-        "useful_question_f1": 0.461538
+        "useful_question_f1": 1.0
       },
       "idea_count": 3,
-      "question_count": 10,
+      "question_count": 8,
       "concept_count": 15
     },
     "security": {
@@ -57,14 +57,14 @@
         "concept_timestamp_recall": 1.0,
         "concept_precision": 0.933333,
         "concept_redundancy_rate": 0.0,
-        "noise_rule_violation_rate": 1.0,
+        "noise_rule_violation_rate": 0.0,
         "summary_duplicate_rate": 0.0,
-        "useful_question_precision": 0.375,
+        "useful_question_precision": 1.0,
         "useful_question_recall": 1.0,
-        "useful_question_f1": 0.545455
+        "useful_question_f1": 1.0
       },
       "idea_count": 3,
-      "question_count": 8,
+      "question_count": 6,
       "concept_count": 15
     },
     "noisy_energy": {
@@ -80,12 +80,12 @@
         "concept_redundancy_rate": 0.0,
         "noise_rule_violation_rate": 0.0,
         "summary_duplicate_rate": 0.0,
-        "useful_question_precision": 0.111111,
-        "useful_question_recall": 0.333333,
-        "useful_question_f1": 0.166667
+        "useful_question_precision": 1.0,
+        "useful_question_recall": 1.0,
+        "useful_question_f1": 1.0
       },
       "idea_count": 3,
-      "question_count": 9,
+      "question_count": 5,
       "concept_count": 15
     }
   },
@@ -98,10 +98,10 @@
     "concept_timestamp_recall": 1.0,
     "concept_precision": 0.966666,
     "concept_redundancy_rate": 0.0,
-    "noise_rule_violation_rate": 0.75,
+    "noise_rule_violation_rate": 0.0,
     "summary_duplicate_rate": 0.0,
-    "useful_question_precision": 0.271528,
-    "useful_question_recall": 0.833333,
-    "useful_question_f1": 0.408799
+    "useful_question_precision": 1.0,
+    "useful_question_recall": 1.0,
+    "useful_question_f1": 1.0
   }
 }

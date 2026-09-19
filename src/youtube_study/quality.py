@@ -15,7 +15,7 @@ from .study_models import ANALYSIS_FORMAT_VERSION, AnalysisResult, StudyIdea, St
 from .transcript import clean_vtt
 
 QUALITY_CORPUS_VERSION = 2
-QUALITY_METRIC_VERSION = 2
+QUALITY_METRIC_VERSION = 3
 POSITIVE_METRICS = {
     "topic_coverage",
     "standalone_claim_coverage",
@@ -354,7 +354,25 @@ def _question_matches(question: StudyQuestion, target: QuestionTarget) -> bool:
         and matches_groups(question.question, target.prompt_groups)
         and matches_groups(reference_text, target.answer_groups)
         and bool(TIMESTAMP_PATTERN.fullmatch(question.timestamp))
+        and question.timestamp in target.timestamps
     )
+
+
+def _matched_question_count(questions: list[StudyQuestion], targets: tuple[QuestionTarget, ...]) -> int:
+    target_matches: dict[int, int] = {}
+
+    def assign(question_index: int, visited: set[int]) -> bool:
+        for target_index, target in enumerate(targets):
+            if target_index in visited or not _question_matches(questions[question_index], target):
+                continue
+            visited.add(target_index)
+            previous = target_matches.get(target_index)
+            if previous is None or assign(previous, visited):
+                target_matches[target_index] = question_index
+                return True
+        return False
+
+    return sum(assign(question_index, set()) for question_index in range(len(questions)))
 
 
 def _matching_concepts(result: AnalysisResult, target: ConceptTarget) -> list[Any]:
@@ -420,14 +438,9 @@ def evaluate_quality_case(case: QualityCase, result: AnalysisResult | None = Non
     )
 
     questions = flatten_questions(result.questions)
-    matched_targets = sum(
-        any(_question_matches(question, target) for question in questions) for target in case.question_targets
-    )
-    useful_questions = sum(
-        any(_question_matches(question, target) for target in case.question_targets) for question in questions
-    )
-    precision = _ratio(useful_questions, len(questions))
-    recall = _ratio(matched_targets, len(case.question_targets))
+    matched_questions = _matched_question_count(questions, case.question_targets)
+    precision = _ratio(matched_questions, len(questions))
+    recall = _ratio(matched_questions, len(case.question_targets))
     f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
 
     metrics = QualityMetrics(

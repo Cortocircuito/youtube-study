@@ -160,17 +160,6 @@ def test_repeated_evidence_references_the_selected_occurrence_exactly() -> None:
     assert question.evidence.fragments[0].end == len(repeated)
 
 
-def test_comprehension_answer_keeps_the_window_start_reference() -> None:
-    result = analyze_cues(clean_vtt(EVIDENCE_FIXTURE))
-    first_question = result.questions["comprension"][0]
-
-    assert first_question.timestamp == "00:00:01"
-    assert first_question.evidence.cue_positions == (0, 1, 2)
-    assert "La caché local" in first_question.answer
-    assert "Primero revisa las métricas" in first_question.answer
-    assert "Después compara la latencia" in first_question.answer
-
-
 def test_evidence_keeps_exact_offsets_for_a_sentence_inside_one_cue() -> None:
     recommendation = "Primero revisa las métricas antes de cambiar la configuración del servicio."
     cue = Cue(

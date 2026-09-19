@@ -19,12 +19,12 @@ from src.youtube_study.quality import (
     matches_groups,
     quality_report_payload,
 )
-from src.youtube_study.study_models import flatten_questions
+from src.youtube_study.study_models import SourceExcerpt, SourceFragment, StudyQuestion, flatten_questions
 from src.youtube_study.transcript import clean_vtt
 
 FIXTURES = Path(__file__).parent / "fixtures"
 CORPUS_PATH = FIXTURES / "quality_corpus.v2.json"
-BASELINE_PATH = FIXTURES / "quality_baseline.v2.json"
+BASELINE_PATH = FIXTURES / "quality_baseline.v3.json"
 
 
 def test_quality_corpus_contract_and_reference_timestamps() -> None:
@@ -112,6 +112,10 @@ def test_current_quality_does_not_regress_from_versioned_baseline() -> None:
     assert report.macro.concept_coverage == 1.0
     assert report.macro.compound_concept_coverage == 1.0
     assert report.macro.concept_timestamp_accuracy == 1.0
+    assert report.macro.noise_rule_violation_rate == 0.0
+    assert report.macro.useful_question_precision == 1.0
+    assert report.macro.useful_question_recall == 1.0
+    assert report.macro.useful_question_f1 == 1.0
     assert set(report.macro.__dataclass_fields__) == POSITIVE_METRICS | NEGATIVE_METRICS
     assert all(0.0 <= value <= 1.0 for value in report.macro.__dict__.values())
 
@@ -119,12 +123,18 @@ def test_current_quality_does_not_regress_from_versioned_baseline() -> None:
 def test_baseline_comparison_reports_positive_and_negative_regressions(tmp_path: Path) -> None:
     report = evaluate_quality_corpus(load_quality_corpus(CORPUS_PATH))
     baseline = quality_report_payload(report)
-    baseline["macro"]["useful_question_precision"] += 0.1
-    baseline["macro"]["noise_rule_violation_rate"] -= 0.1
     baseline_path = tmp_path / "baseline.json"
     baseline_path.write_text(json.dumps(baseline), encoding="utf-8")
+    degraded = replace(
+        report,
+        macro=replace(
+            report.macro,
+            useful_question_precision=0.0,
+            noise_rule_violation_rate=0.1,
+        ),
+    )
 
-    regressions = baseline_regressions(report, baseline_path)
+    regressions = baseline_regressions(degraded, baseline_path)
 
     assert any("macro.useful_question_precision" in item for item in regressions)
     assert any("macro.noise_rule_violation_rate" in item for item in regressions)
@@ -176,3 +186,49 @@ def test_concept_precision_penalizes_unannotated_candidates() -> None:
     degraded = evaluate_quality_case(case, result).metrics.concept_precision
 
     assert degraded < original
+
+
+def test_question_match_requires_the_primary_timestamp_to_reference_the_target() -> None:
+    case = load_quality_corpus(CORPUS_PATH).cases[0]
+    result = analyze_cues(clean_vtt(case.vtt_path))
+    target = next(target for target in case.question_targets if target.id == "riego_profundo")
+    question = next(item for item in result.questions["basicas"] if "riego" in item.question)
+    unrelated = result.cues[0]
+    evidence = SourceExcerpt(
+        f"{unrelated.text} {question.answer}",
+        (
+            SourceFragment(0, unrelated.start, 0, len(unrelated.text), unrelated.text),
+            *question.evidence.fragments,
+        ),
+    )
+    result.questions = {
+        "basicas": [StudyQuestion(question.question, evidence, question.category)],
+        "comprension": [],
+        "practicas": [],
+    }
+    case = replace(case, question_targets=(target,))
+
+    report = evaluate_quality_case(case, result)
+
+    assert report.metrics.useful_question_recall == 0.0
+
+
+def test_question_metrics_match_predictions_and_targets_one_to_one() -> None:
+    case = load_quality_corpus(CORPUS_PATH).cases[0]
+    target = case.question_targets[0]
+    duplicated_target = replace(target, id=f"{target.id}_duplicate")
+    case = replace(case, question_targets=(target, duplicated_target))
+    result = analyze_cues(clean_vtt(case.vtt_path))
+    matching = next(
+        question
+        for question in flatten_questions(result.questions)
+        if question.category == target.category
+        and question.timestamp == target.timestamps[0]
+        and matches_groups(question.question, target.prompt_groups)
+    )
+    result.questions = {"basicas": [], "comprension": [], "practicas": [matching]}
+
+    report = evaluate_quality_case(case, result)
+
+    assert report.metrics.useful_question_precision == 1.0
+    assert report.metrics.useful_question_recall == 0.5

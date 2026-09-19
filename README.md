@@ -96,7 +96,7 @@ anki.csv
 
 `tools.json` y `tools.md` incluyen la categoría y procedencia de cada hallazgo. `anki.csv` incorpora tags de video, canal, categoría, procedencia y tipo de pregunta.
 
-El formato de análisis actual es **v3**. Las preguntas y flashcards contienen una respuesta extractiva, un timestamp y un fragmento fuente. Los conceptos incluyen unigramas y frases compuestas, componentes normalizados de puntuación y referencias temporales. `python app.py analyze VIDEO_ID` regenera análisis antiguos desde los subtítulos locales, sin descargar de nuevo el video.
+El formato de análisis actual es **v3**. Las preguntas y flashcards contienen una respuesta extractiva, un timestamp y un fragmento fuente; sus temas se derivan de relaciones explicativas, recomendaciones concretas, causas o condiciones explícitas. Los conceptos incluyen unigramas y frases compuestas, componentes normalizados de puntuación y referencias temporales. `python app.py analyze VIDEO_ID` regenera análisis antiguos desde los subtítulos locales, sin descargar de nuevo el video.
 
 ## Flujo de estudio recomendado
 

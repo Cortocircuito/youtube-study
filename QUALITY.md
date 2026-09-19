@@ -43,7 +43,7 @@ El reporte usa promedio macro para que un dominio no oculte otro. También compa
 
 ## Línea base
 
-`tests/fixtures/quality_baseline.v2.json` registra el mejor comportamiento revisado hasta el momento. No representa un objetivo final: actualmente expone una tasa macro de violación de ruido de `0.75` y todavía hay preguntas poco útiles. Su función es impedir regresiones mientras permite mejorar cualquier métrica. Un hash enlaza el baseline con el JSON del corpus y los VTT exactos para impedir comparaciones entre revisiones diferentes.
+`tests/fixtures/quality_baseline.v3.json` registra el mejor comportamiento revisado hasta el momento. No representa un objetivo final: su función es impedir regresiones mientras permite mejorar cualquier métrica. Un hash enlaza el baseline con el JSON del corpus y los VTT exactos para impedir comparaciones entre revisiones diferentes.
 
 Para inspeccionar el reporte actual:
 
@@ -59,7 +59,7 @@ python -m pytest tests/test_quality.py tests/test_quality_corpus.py
 
 El baseline sólo debe actualizarse después de revisar el diff del reporte y confirmar que el cambio es una mejora real. Las métricas positivas no pueden bajar y las negativas no pueden subir.
 
-Los `question_targets` forman el conjunto cerrado de preguntas consideradas útiles para cada fixture. Deben anotar todas las formulaciones pedagógicamente aceptables mediante grupos de aliases. Una pregunta nueva que sea válida pero no coincida exige revisar las anotaciones antes de interpretar el cambio de precisión.
+Los `question_targets` forman el conjunto cerrado de preguntas consideradas útiles para cada fixture. Deben anotar todas las formulaciones pedagógicamente aceptables mediante grupos de aliases. Una pregunta nueva que sea válida pero no coincida exige revisar las anotaciones antes de interpretar el cambio de precisión. La métrica v3 exige que el timestamp principal pertenezca a la evidencia temporal del objetivo y empareja preguntas con objetivos uno a uno.
 
 ## Reconstrucción y ruido
 
@@ -67,13 +67,19 @@ El análisis reconstruye unidades textuales desde cues incompletos antes de sele
 
 El filtro de ruido sólo afecta al material de estudio. Los cues originales permanecen en `AnalysisResult` y en las transcripciones exportadas. Para reducir falsos positivos, una unidad sólo se descarta cuando combina varias señales de producción, por ejemplo promoción explícita del canal, revisión de audio o una transición vacía. Las muletillas aisladas se penalizan durante la selección, pero no se eliminan ni se reescriben.
 
-Después de esta fase, `noisy_energy.noise_rule_violation_rate` es `0.0`. Los otros casos todavía penalizan temas genéricos en preguntas; su mejora corresponde a la fase específica de generación de preguntas.
+Después de la reconstrucción, `noisy_energy.noise_rule_violation_rate` es `0.0`. La fase de preguntas eliminó también las plantillas genéricas anotadas en los otros perfiles sin filtrar palabras válidas dentro de temas específicos.
 
 ## Conceptos compuestos
 
 El formato de análisis v3 extrae candidatos contiguos de una a tres palabras desde unidades informativas. La puntuación combina frecuencia normalizada, distribución temporal y, para frases compuestas, asociación entre sus componentes. Los filtros conservan términos individuales útiles, permiten conectores internos como `de` o `entre` y descartan acciones discursivas genéricas.
 
 `concepts.md`, `concepts.json` y `study.md` recorren la misma lista ordenada de conceptos. Los tres conservan menciones y timestamps; Markdown añade enlaces al video cuando existe `webpage_url`. Los `concept_targets` forman el conjunto cerrado aceptado para calcular precisión. El corpus v2 exige cobertura completa de sus conceptos anotados, precisión temporal completa, precisión conceptual macro superior a `0.96` y redundancia cero.
+
+## Preguntas específicas
+
+Las preguntas básicas se generan desde unidades explicativas y sólo una vez por fragmento fuente. El tema se toma de un concepto que aparece antes de la relación explicada, lo que favorece sujetos como `medidor enchufable` frente a términos incidentales de la misma oración.
+
+Las preguntas prácticas conservan una frase breve en orden textual, no una única palabra elegida por frecuencia. Las preguntas de comprensión sólo se crean cuando hay una causa o condición explícita y no es ya una recomendación. El corpus revisado contiene objetivos de comprensión y obtiene precisión, recall y F1 macro de `1.0`; estos valores corresponden únicamente a los cuatro fixtures sanitizados y no sustituyen la evaluación humana de videos largos.
 
 ## Evaluación de videos largos
 

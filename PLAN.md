@@ -18,17 +18,19 @@ La aplicación funciona localmente sin Ollama y permite:
 
 ## Prioridades próximas sin IA
 
-1. Usar el corpus y baseline de `QUALITY.md` para mejorar puntuación, ruido y separación de párrafos sin regresiones.
+1. Completar la anotación humana de la muestra local de videos largos descrita en `QUALITY.md`.
 2. Ampliar las ramas cubiertas de descarga y fallos de publicación antes de decidir si conviene fijar un umbral.
 3. Mejorar filtros de biblioteca por canal, herramienta, tema y estado de estudio.
 4. Reforzar reintentos ante fallos temporales de descarga sin sobrescribir resultados válidos.
-5. Evaluar conceptos compuestos sin reducir la fidelidad extractiva del análisis.
+5. Mejorar la separación de párrafos con fixtures variados sin reducir la fidelidad extractiva.
 
 La fase inicial de evaluación ya dispone de objetivos manuales sobre fixtures sanitizados, métricas direccionales y una muestra local de videos largos pendiente de anotación humana. Esta muestra no participa en CI ni convierte resultados generados en referencias de calidad.
 
 La segunda fase reconstruye unidades legibles desde cues fragmentados, conserva evidencia exacta y filtra ruido inequívoco sólo en el material de estudio. El caso ruidoso del corpus ya no presenta violaciones; quedan pendientes los temas genéricos de preguntas y la anotación manual de videos largos.
 
 La tercera fase extrae conceptos de una a tres palabras, puntúa frecuencia, distribución y asociación, elimina variantes redundantes y alinea `concepts.md`, `concepts.json` y la sección correspondiente de `study.md`. El formato de análisis v3 permite regenerar estos artefactos desde subtítulos locales.
+
+La cuarta fase formula una sola pregunta básica por evidencia explicativa, usa temas prácticos breves en orden textual y reserva las preguntas de comprensión para causas o condiciones explícitas. El corpus sanitizado alcanza precisión, recall y F1 de preguntas completos para sus objetivos revisados; la métrica v3 exige además timestamp correcto y emparejamiento uno a uno.
 
 ## Posibles mejoras posteriores
 

@@ -16,12 +16,14 @@
         {"id": "ventilacion_enfermedades", "marker_groups": [["ventilación"], ["enfermedades"], ["poda"]], "timestamps": ["00:00:44"]}
       ],
       "noise_rules": [
-        {"id": "temas_genericos", "scope": "question_prompts", "aliases": ["estable", "semana"], "max_occurrences": 0}
+        {"id": "temas_genericos", "scope": "question_prompts", "aliases": ["idea principal relacionada con estable", "idea principal relacionada con semana"], "max_occurrences": 0}
       ],
       "question_targets": [
         {"id": "preparar_suelo", "category": "practicas", "prompt_groups": [["cultivar", "suelo"]], "answer_groups": [["suelo"], ["compost"]], "timestamps": ["00:00:01"]},
         {"id": "mantener_humedad", "category": "practicas", "prompt_groups": [["humedad", "riego"]], "answer_groups": [["humedad"], ["estrés"], ["agrieten", "grietas"]], "timestamps": ["00:00:20"]},
-        {"id": "riego_profundo", "category": "basicas", "prompt_groups": [["riego"]], "answer_groups": [["profundo"], ["raíces"]], "timestamps": ["00:00:12"]}
+        {"id": "riego_profundo", "category": "basicas", "prompt_groups": [["riego"]], "answer_groups": [["profundo"], ["raíces"]], "timestamps": ["00:00:12"]},
+        {"id": "humedad_estable", "category": "basicas", "prompt_groups": [["humedad"], ["estable"]], "answer_groups": [["estrés"], ["frutos"]], "timestamps": ["00:00:20"]},
+        {"id": "regar_cerca_suelo", "category": "practicas", "prompt_groups": [["riega", "regar"], ["suelo"]], "answer_groups": [["hojas"], ["hongos"]], "timestamps": ["00:00:36"]}
       ],
       "concept_targets": [
         {"id": "materia_organica", "aliases": ["materia orgánica"], "timestamps": ["00:00:05"], "compound": true},
@@ -57,12 +59,17 @@
         {"id": "verificar_respaldo", "marker_groups": [["restauración"], ["respaldo", "copia de seguridad"], ["prueba", "funciona"]], "timestamps": ["00:00:39", "00:00:47"]}
       ],
       "noise_rules": [
-        {"id": "temas_genericos", "scope": "question_prompts", "aliases": ["datos", "crear", "confirma", "cambio"], "max_occurrences": 0}
+        {"id": "temas_genericos", "scope": "question_prompts", "aliases": ["idea principal relacionada con datos", "idea principal relacionada con crear", "idea principal relacionada con confirma", "idea principal relacionada con cambio"], "max_occurrences": 0}
       ],
       "question_targets": [
         {"id": "coste_indice", "category": "basicas", "prompt_groups": [["índice"]], "answer_groups": [["lecturas"], ["escritura"], ["almacenamiento"]], "timestamps": ["00:00:15"]},
         {"id": "medir_antes", "category": "practicas", "prompt_groups": [["datos", "optimizar"]], "answer_groups": [["medir"], ["consultas lentas"]], "timestamps": ["00:00:02"]},
-        {"id": "restauracion_prueba", "category": "basicas", "prompt_groups": [["restauración"]], "answer_groups": [["copia de seguridad"], ["prueba"]], "timestamps": ["00:00:39"]}
+        {"id": "restauracion_prueba", "category": "basicas", "prompt_groups": [["restauración", "copia de seguridad"]], "answer_groups": [["copia de seguridad"], ["prueba"]], "timestamps": ["00:00:39"]},
+        {"id": "plan_ejecucion", "category": "basicas", "prompt_groups": [["plan de ejecución"]], "answer_groups": [["consume tiempo"]], "timestamps": ["00:00:07"]},
+        {"id": "verificar_restauracion", "category": "basicas", "prompt_groups": [["restauración"]], "answer_groups": [["respaldo"], ["procedimiento"]], "timestamps": ["00:00:47"]},
+        {"id": "evitar_indices", "category": "practicas", "prompt_groups": [["crear"], ["índices"]], "answer_groups": [["penaliza"], ["actualizaciones"]], "timestamps": ["00:00:23"]},
+        {"id": "comparar_cambios", "category": "practicas", "prompt_groups": [["cambio"], ["latencia"]], "answer_groups": [["compara"], ["recursos"], ["resultados"]], "timestamps": ["00:00:55"]},
+        {"id": "situacion_respaldo", "category": "comprension", "prompt_groups": [["situación"], ["copia de seguridad"]], "answer_groups": [["restauración"], ["prueba"]], "timestamps": ["00:00:39"]}
       ],
       "concept_targets": [
         {"id": "base_datos", "aliases": ["base de datos"], "timestamps": ["00:00:02"], "compound": true},
@@ -97,12 +104,15 @@
         {"id": "restauracion_verificada", "marker_groups": [["restauración verificada"], ["recuperarse"], ["emergencia"]], "timestamps": ["00:00:48"]}
       ],
       "noise_rules": [
-        {"id": "temas_genericos", "scope": "question_prompts", "aliases": ["protege", "compartir", "verificada"], "max_occurrences": 0}
+        {"id": "temas_genericos", "scope": "question_prompts", "aliases": ["idea principal relacionada con protege", "idea principal relacionada con compartir", "idea principal relacionada con verificada"], "max_occurrences": 0}
       ],
       "question_targets": [
         {"id": "funcion_cifrado", "category": "basicas", "prompt_groups": [["cifrado"]], "answer_groups": [["protege"], ["archivos"], ["dispositivo"]], "timestamps": ["00:00:03"]},
         {"id": "no_compartir_cuenta", "category": "practicas", "prompt_groups": [["compartir", "cuenta"]], "answer_groups": [["cuenta"], ["trazabilidad"]], "timestamps": ["00:00:24"]},
-        {"id": "definir_permisos", "category": "basicas", "prompt_groups": [["permisos"]], "answer_groups": [["usuarios"], ["leer", "modificar"]], "timestamps": ["00:00:16"]}
+        {"id": "definir_permisos", "category": "basicas", "prompt_groups": [["permisos"]], "answer_groups": [["usuarios"], ["leer", "modificar"]], "timestamps": ["00:00:16"]},
+        {"id": "clave_robusta", "category": "basicas", "prompt_groups": [["clave robusta"]], "answer_groups": [["acceso"], ["no autorizado"]], "timestamps": ["00:00:08"]},
+        {"id": "copias_independientes", "category": "basicas", "prompt_groups": [["copias de seguridad"]], "answer_groups": [["versión independiente"], ["información"]], "timestamps": ["00:00:32"]},
+        {"id": "situacion_cifrado", "category": "comprension", "prompt_groups": [["situación"], ["cifrado"]], "answer_groups": [["pierde"], ["dispositivo"]], "timestamps": ["00:00:03"]}
       ],
       "concept_targets": [
         {"id": "clave_robusta", "aliases": ["clave robusta"], "timestamps": ["00:00:08"], "compound": true},
@@ -145,7 +155,9 @@
       "question_targets": [
         {"id": "funcion_medidor", "category": "basicas", "prompt_groups": [["medidor", "consumo"]], "answer_groups": [["potencia"], ["consumo acumulado"]], "timestamps": ["00:00:27"]},
         {"id": "sellar_primero", "category": "practicas", "prompt_groups": [["sellar", "ventanas"]], "answer_groups": [["sellar"], ["ventanas"], ["calefacción"]], "timestamps": ["00:00:50"]},
-        {"id": "programar_termostato", "category": "practicas", "prompt_groups": [["termostato"]], "answer_groups": [["termostato"], ["vivienda"], ["vacía"]], "timestamps": ["00:01:13"]}
+        {"id": "programar_termostato", "category": "practicas", "prompt_groups": [["termostato"]], "answer_groups": [["termostato"], ["vivienda"], ["vacía"]], "timestamps": ["00:01:13"]},
+        {"id": "identificar_consumo", "category": "basicas", "prompt_groups": [["consumo"]], "answer_groups": [["identificar"], ["energía"]], "timestamps": ["00:00:19"]},
+        {"id": "funcion_aislamiento", "category": "basicas", "prompt_groups": [["aislamiento"]], "answer_groups": [["pérdida de calor"], ["calefacción"]], "timestamps": ["00:00:42"]}
       ],
       "concept_targets": [
         {"id": "medidor_enchufable", "aliases": ["medidor enchufable"], "timestamps": ["00:00:27"], "compound": true},

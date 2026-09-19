@@ -323,26 +323,90 @@ def question_key(question: str) -> str:
     return " ".join(re.findall(r"[a-záéíóúñü0-9]+", question.lower()))
 
 
-QUESTION_TOPIC_EXCLUSIONS = {
-    "evita",
-    "evitar",
-    "mantener",
-    "revisa",
-    "revisar",
-    "probar",
-    "optimizar",
-    "conviene",
-    "presenta",
-    "reduce",
-    "aumenta",
-    "ayuda",
-    "permite",
-}
+QUESTION_TOPIC_EXCLUSIONS = {"conviene", "debe", "debería", "presenta"}
+QUESTION_TOPIC_BOUNDARIES = {"aumenta", "confirma", "evita", "permite", "reduce"}
+
+EXPLANATION_PATTERN = re.compile(
+    r"\b(?:es|son|puede|pueden|define|definen|permite|permiten|sirve|consiste|significa|funciona|"
+    r"protege|protegen|conecta|conectan|muestra|muestran|registra|registran|reduce|reducen|"
+    r"aumenta|aumentan|limita|limitan|conserva|conservan|agrupa|agrupan|acelera|aceleran|"
+    r"confirma|confirman|debe|deben)\b",
+    re.IGNORECASE,
+)
+CAUSAL_PATTERN = re.compile(r"\s+(?:porque|ya que|debido a que)\s+", re.IGNORECASE)
+CONDITION_PATTERN = re.compile(r"\s+cuando\s+", re.IGNORECASE)
 
 
 def question_topic(text: str, excluded: set[str] | None = None) -> str:
     ignored = QUESTION_TOPIC_EXCLUSIONS | (excluded or set())
-    return next((word for word, _ in keywords(text, 8) if word not in ignored), "este tema")
+    selected: list[str] = []
+    for word in re.findall(r"[a-záéíóúñü0-9][a-záéíóúñü0-9_.-]{2,}", text.lower()):
+        word = word.strip(".-_")
+        if selected and word in QUESTION_TOPIC_BOUNDARIES:
+            break
+        if not word or word in STOPWORDS or word in ignored or word.isdigit() or word in selected:
+            continue
+        selected.append(word)
+    return " ".join(selected[:3]) or "este tema"
+
+
+def evidence_key(evidence: SourceExcerpt) -> tuple[tuple[int, int, int], ...]:
+    return tuple((fragment.cue_index, fragment.start, fragment.end) for fragment in evidence.fragments)
+
+
+def explanatory_topic(text: str, concepts: list[ConceptMention]) -> str | None:
+    relation = EXPLANATION_PATTERN.search(text)
+    if relation is None or CAUSAL_PATTERN.search(text):
+        return None
+    candidates: list[tuple[int, int, str]] = []
+    for concept in concepts:
+        match = re.search(r"(?<![\w.-])" + re.escape(concept.name) + r"(?!\w|-(?=\w)|\.(?=\w))", text, re.IGNORECASE)
+        if match and match.end() <= relation.start():
+            candidates.append((match.start(), len(concept.name.split()), concept.name))
+    if not candidates:
+        return None
+    leading_word = next((word for word in WORD_PATTERN.findall(text.lower()) if word not in STOPWORDS), "")
+    if leading_word.endswith(("ar", "er", "ir")):
+        candidates = [candidate for candidate in candidates if candidate[2] != leading_word]
+        return min(candidates, key=lambda item: (item[0], -item[1]))[2] if candidates else None
+    return max(candidates, key=lambda item: (item[0], item[1]))[2]
+
+
+def term_is_explained(text: str, term: str) -> bool:
+    relation = EXPLANATION_PATTERN.search(text)
+    if relation is None or CAUSAL_PATTERN.search(text):
+        return False
+    match = re.search(r"(?<![\w.-])" + re.escape(term) + r"(?!\w|-(?=\w)|\.(?=\w))", text, re.IGNORECASE)
+    return bool(match and match.end() <= relation.start())
+
+
+def causal_question(text: str) -> str | None:
+    match = CAUSAL_PATTERN.search(text)
+    if match is None:
+        return None
+    claim = text[: match.start()].strip(" .,:;")
+    if not 3 <= len(WORD_PATTERN.findall(claim)) <= 18:
+        return None
+    claim = lowercase_sentence_start(claim)
+    return f"¿Por qué se afirma que {claim}?"
+
+
+def conditional_question(text: str) -> str | None:
+    match = CONDITION_PATTERN.search(text)
+    if match is None:
+        return None
+    claim = text[: match.start()].strip(" .,:;")
+    if not 3 <= len(WORD_PATTERN.findall(claim)) <= 18:
+        return None
+    claim = lowercase_sentence_start(claim)
+    return f"¿En qué situación se afirma que {claim}?"
+
+
+def lowercase_sentence_start(text: str) -> str:
+    first_word = text.split(maxsplit=1)[0]
+    if "." in first_word or any(character.isupper() for character in first_word[1:]):
+        return text
+    return text[:1].lower() + text[1:]
 
 
 def practical_excerpt(evidence: SourceExcerpt) -> SourceExcerpt | None:
@@ -351,7 +415,16 @@ def practical_excerpt(evidence: SourceExcerpt) -> SourceExcerpt | None:
         r"\b(?:debe|debería|conviene|primero|evita|revisa|compara|ajusta|deja|riega|hay que|no conviene)\b",
         re.IGNORECASE,
     )
-    sentence = next((sentence for sentence in sentences if action_pattern.search(sentence)), None)
+    sentence = next(
+        (
+            sentence
+            for sentence in sentences
+            if action_pattern.search(
+                CONDITION_PATTERN.split(CAUSAL_PATTERN.split(sentence, maxsplit=1)[0], maxsplit=1)[0]
+            )
+        ),
+        None,
+    )
     return slice_source_excerpt(evidence, sentence) if sentence else None
 
 
@@ -373,35 +446,31 @@ def questions(
         seen.add(key)
         groups[category].append(StudyQuestion(question, evidence, category))
 
+    units = informative_units(cues) if units is None else units
     used_topics: set[str] = set()
+    basic_evidence: set[tuple[tuple[int, int, int], ...]] = set()
     for tool in tools[:4]:
         evidence = source_excerpt_for_term(cues, tool.name, units)
-        if evidence:
+        key = evidence_key(evidence) if evidence else None
+        if evidence and key not in basic_evidence and term_is_explained(evidence.text, tool.name):
             add("basicas", f"¿Qué se explica sobre {tool.name}?", evidence)
             used_topics.add(tool.name.lower())
+            basic_evidence.add(key)
 
-    question_concepts = sorted(
-        concepts,
-        key=lambda concept: (" " in concept.name, -(concept.count + min(len(concept.timestamps), 5) * 2)),
-    )
-    for concept in question_concepts:
+    for unit in units:
         if len(groups["basicas"]) >= 4:
             break
-        if concept.name in used_topics or concept.name in QUESTION_TOPIC_EXCLUSIONS:
+        topic = explanatory_topic(unit.text, concepts)
+        if topic is None or topic in used_topics or evidence_key(unit.evidence) in basic_evidence:
             continue
-        evidence = source_excerpt_for_term(cues, concept.name, units)
-        if evidence:
-            add("basicas", f"¿Qué se explica sobre {concept.name}?", evidence)
-            used_topics.add(concept.name)
-
-    for idea in ideas[:4]:
-        topic = question_topic(idea.text, used_topics)
-        add(
-            "comprension",
-            f"¿Cuál es la idea principal relacionada con {topic}?",
-            idea.evidence,
-        )
+        add("basicas", f"¿Qué se explica sobre {topic}?", unit.evidence)
         used_topics.add(topic)
+        basic_evidence.add(evidence_key(unit.evidence))
+
+    for unit in units:
+        question = causal_question(unit.text) or conditional_question(unit.text)
+        if question and practical_excerpt(unit.evidence) is None:
+            add("comprension", question, unit.evidence)
 
     practical_candidates = [excerpt for idea in ideas if (excerpt := practical_excerpt(idea.evidence)) is not None]
     for excerpt in practical_candidates[-3:]:
