@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .analyzer import analyze_cues
-from .artifacts import publish_artifacts, recover_pending_publication, staging_directory
+from .artifacts import publish_artifacts, staging_directory
 from .downloader import SubtitleSelection, choose_subtitle, download_subtitles
 from .errors import VideoDataError
 from .exporter import (
@@ -83,11 +83,10 @@ def _render_study_files(
 def generate_study_files(
     metadata: VideoMetadata, video_dir: Path, subtitle: SubtitleSelection, library_path: Path
 ) -> Path:
-    recover_pending_publication(video_dir)
     result = _analyze_subtitle(subtitle)
     with staging_directory(video_dir) as staging_dir:
         _render_study_files(metadata, staging_dir, subtitle, result)
-        publish_artifacts(staging_dir, video_dir, GENERATED_ARTIFACTS)
+        publish_artifacts(staging_dir, video_dir, GENERATED_ARTIFACTS, retry_command="study o analyze")
 
     upsert_video(library_path, metadata, video_dir, result.tools)
     return video_dir
@@ -106,7 +105,6 @@ def load_existing_video(video_id: str, out: Path, languages: str) -> tuple[Video
     video_dir = out / video_id
     if not video_dir.exists():
         raise VideoDataError(f"No existe el directorio del video: {video_dir}")
-    recover_pending_publication(video_dir)
     info_path = video_dir / "info.json"
     if not info_path.exists():
         raise VideoDataError(f"No existe info.json para {video_id}: {info_path}")
@@ -139,5 +137,5 @@ def export_study(video_id: str, out: Path, languages: str, export_format: str) -
             write_anki_csv(staging_dir / "anki.csv", result.cards, video_id, metadata.uploader, source_url)
             names.append("anki.csv")
         if names:
-            publish_artifacts(staging_dir, video_dir, names)
+            publish_artifacts(staging_dir, video_dir, names, retry_command="export")
     return [video_dir / name for name in names]

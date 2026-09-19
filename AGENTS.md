@@ -72,7 +72,7 @@ src/youtube_study/downloader.py  # descarga subtítulos con yt-dlp
 src/youtube_study/transcript.py  # limpieza y transformación de VTT
 src/youtube_study/analyzer.py    # análisis heurístico
 src/youtube_study/study_models.py # modelos de evidencia y resultados
-src/youtube_study/artifacts.py    # staging, publicación y recuperación
+src/youtube_study/artifacts.py    # staging y publicación atómica por archivo
 src/youtube_study/tool_catalog.* # catálogo versionado de herramientas
 src/youtube_study/library.py     # biblioteca local
 src/youtube_study/search.py      # búsqueda en transcripciones
@@ -86,6 +86,8 @@ PLAN.md                          # roadmap futuro del proyecto
 - Mantener la app usable sin Ollama por ahora.
 - No depender del `yt-dlp` de `apt`; usar `requirements.txt` en un venv.
 - Los archivos generados en `data/videos/` no deben versionarse.
+- Las lecturas de `library.json` no deben repararlo ni reescribirlo; usar `rebuild-library` para recuperación explícita.
+- Una publicación interrumpida se completa repitiendo `study`, `analyze` o `export`; no añadir journals o rollback sin un requisito nuevo.
 - No leer archivos completos de `data/videos/`, `.vtt`, `transcript.txt` o transcripciones largas salvo petición explícita del usuario.
 - Para revisar transcripciones largas, usar búsquedas, fragmentos pequeños o comandos con límites.
 - Al ejecutar planes con `openplan`, avanzar por fases cortas y pausar después de máximo 5 pasos.

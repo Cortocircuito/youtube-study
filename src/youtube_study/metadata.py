@@ -85,18 +85,15 @@ def persisted_video_from_mapping(data: Any, *, expected_id: str, source: str) ->
         raise VideoDataError(f"{source}: se esperaba un objeto JSON")
     metadata = normalize_video_metadata(data, source=source, expected_id=expected_id)
     analysis = data.get("analysis")
-    format_version: int | None = None
     if analysis is not None:
         if not isinstance(analysis, Mapping):
             raise VideoDataError(f"{source}: 'analysis' debe ser un objeto")
         value = analysis.get("format_version")
         if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 1):
             raise VideoDataError(f"{source}: analysis.format_version debe ser un entero positivo")
-        format_version = value
     return PersistedVideoInfo(
         metadata=metadata,
         source_subtitle=_validate_source_subtitle(data.get("source_subtitle"), source),
-        analysis_format_version=format_version,
     )
 
 

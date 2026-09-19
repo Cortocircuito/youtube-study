@@ -105,11 +105,29 @@ def test_list_and_show_successfully_display_library_entry(tmp_path: Path) -> Non
     assert "- summary.md" in shown.stdout
 
 
+def test_list_corrupt_library_reports_explicit_rebuild(tmp_path: Path) -> None:
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    library_path = data_dir / "library.json"
+    original = b"{corrupt"
+    library_path.write_bytes(original)
+
+    result = run_cli("list", "--out", str(data_dir / "videos"))
+
+    assert result.returncode == 1
+    assert "rebuild-library" in result.stderr
+    assert "Traceback" not in result.stderr
+    assert library_path.read_bytes() == original
+
+
 def test_rebuild_library_command_creates_and_lists_video(tmp_path: Path) -> None:
     videos_dir = tmp_path / "data" / "videos"
     video_dir = videos_dir / "demo"
     video_dir.mkdir(parents=True)
     (video_dir / "info.json").write_text(json.dumps({"id": "demo", "title": "Reconstruido"}), encoding="utf-8")
+    library_path = tmp_path / "data" / "library.json"
+    original = b"{corrupt"
+    library_path.write_bytes(original)
 
     rebuilt = run_cli("rebuild-library", "--out", str(videos_dir))
     listed = run_cli("list", "--out", str(videos_dir))
@@ -118,6 +136,9 @@ def test_rebuild_library_command_creates_and_lists_video(tmp_path: Path) -> None
     assert "Biblioteca reconstruida: 1 videos." in rebuilt.stdout
     assert listed.returncode == 0
     assert "Reconstruido" in listed.stdout
+    backups = list((tmp_path / "data").glob("library.json.corrupt-*"))
+    assert len(backups) == 1
+    assert backups[0].read_bytes() == original
 
 
 def test_analyze_and_export_successfully_via_cli(tmp_path: Path) -> None:

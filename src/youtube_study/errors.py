@@ -9,8 +9,8 @@ class VideoDataError(AppError):
     """A requested local video or its metadata/artifacts are missing or invalid."""
 
 
-class ArtifactRecoveryError(VideoDataError):
-    """An artifact publication could not be completed or recovered safely."""
+class ArtifactPublicationError(VideoDataError):
+    """Publishing generated artifacts stopped before all replacements completed."""
 
 
 class SubtitleError(AppError):

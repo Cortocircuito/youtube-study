@@ -20,6 +20,10 @@ class LibraryError(AppError):
     """Expected error while reading or writing the local video library."""
 
 
+class InvalidLibraryError(LibraryError):
+    """The library contents are not valid JSON or do not match its schema."""
+
+
 @dataclass
 class RebuildResult:
     rebuilt: int
@@ -49,36 +53,24 @@ def _backup_invalid_library(path: Path) -> Path:
     return backup
 
 
-def _recover_invalid_library(path: Path, reason: str) -> dict[str, list[dict[str, Any]]]:
-    try:
-        backup = _backup_invalid_library(path)
-    except OSError as backup_error:
-        raise LibraryError(f"No se pudo leer ni respaldar la biblioteca: {path}") from backup_error
-    recovered = _empty_library()
-    save_library(path, recovered)
-    warnings.warn(
-        f"{reason} Se respaldó en {backup} y se creó una biblioteca vacía.",
-        RuntimeWarning,
-        stacklevel=2,
-    )
-    return recovered
-
-
-def load_library(path: Path) -> dict[str, Any]:
-    """Load local library, preserving a backup and recovering from invalid JSON."""
+def _read_library(path: Path) -> tuple[dict[str, Any], list[str]]:
     try:
         if not path.exists() or path.stat().st_size == 0:
-            return _empty_library()
+            return _empty_library(), []
         with path.open("r", encoding="utf-8") as file:
             data = json.load(file)
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        return _recover_invalid_library(path, "La biblioteca estaba dañada.")
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise InvalidLibraryError(
+            f"La biblioteca contiene JSON inválido: {path}. Ejecuta rebuild-library para reconstruirla."
+        ) from exc
     except OSError as exc:
         raise LibraryError(f"No se pudo leer la biblioteca: {path}") from exc
 
     videos = data.get("videos") if isinstance(data, dict) else None
     if not isinstance(videos, list):
-        return _recover_invalid_library(path, "La estructura de la biblioteca era inválida.")
+        raise InvalidLibraryError(
+            f"La estructura de la biblioteca es inválida: {path}. Ejecuta rebuild-library para reconstruirla."
+        )
 
     valid_videos: list[LibraryEntry] = []
     invalid_entries: list[str] = []
@@ -87,20 +79,19 @@ def load_library(path: Path) -> dict[str, Any]:
             valid_videos.append(_validate_library_entry(video, index))
         except LibraryError as exc:
             invalid_entries.append(str(exc))
+    return {**data, "videos": valid_videos}, invalid_entries
+
+
+def load_library(path: Path) -> dict[str, Any]:
+    """Load valid entries without modifying or repairing the library file."""
+    data, invalid_entries = _read_library(path)
     if invalid_entries:
-        recovered = {**data, "videos": valid_videos}
-        try:
-            backup = _backup_invalid_library(path)
-        except OSError as exc:
-            raise LibraryError(f"No se pudo respaldar la biblioteca inválida: {path}") from exc
-        save_library(path, recovered)
         warnings.warn(
-            f"Se omitieron {len(invalid_entries)} entradas inválidas de la biblioteca. Respaldo: {backup}",
+            f"Se omitieron {len(invalid_entries)} entradas inválidas de la biblioteca: {'; '.join(invalid_entries)}",
             RuntimeWarning,
             stacklevel=2,
         )
-        return recovered
-    return {**data, "videos": valid_videos}
+    return data
 
 
 def _validate_library_entry(value: Any, index: int) -> LibraryEntry:
@@ -131,7 +122,7 @@ def _validate_library_entry(value: Any, index: int) -> LibraryEntry:
         if field in value and (not isinstance(value[field], str) or not value[field]):
             raise LibraryError(f"{source}: '{field}' debe ser texto no vacío")
 
-    return {
+    entry: LibraryEntry = {
         "id": video_id,
         "title": title,
         "channel": value.get("channel"),
@@ -139,9 +130,12 @@ def _validate_library_entry(value: Any, index: int) -> LibraryEntry:
         "url": value.get("url"),
         "path": path,
         "tools": list(tools),
-        "created_at": value.get("created_at", ""),
-        "updated_at": value.get("updated_at", ""),
     }
+    if "created_at" in value:
+        entry["created_at"] = value["created_at"]
+    if "updated_at" in value:
+        entry["updated_at"] = value["updated_at"]
+    return entry
 
 
 def save_library(path: Path, data: dict[str, Any]) -> None:
@@ -219,7 +213,11 @@ def _video_entry(
 
 def upsert_video(path: Path, metadata: VideoMetadata, video_dir: Path, tools: list[ToolMention]) -> LibraryEntry:
     """Insert or update one video in the local library, deduplicated by id."""
-    data = load_library(path)
+    data, invalid_entries = _read_library(path)
+    if invalid_entries:
+        raise InvalidLibraryError(
+            f"La biblioteca contiene entradas inválidas. Ejecuta rebuild-library antes de actualizarla: {path}"
+        )
     now = utc_now()
     video_id = metadata.id
 
@@ -229,7 +227,7 @@ def upsert_video(path: Path, metadata: VideoMetadata, video_dir: Path, tools: li
         video_dir,
         path,
         [tool.name for tool in tools],
-        existing.get("created_at", now) if existing else now,
+        (existing.get("created_at") or now) if existing else now,
         now,
     )
     if existing:
@@ -267,37 +265,46 @@ def _tool_names_from_artifact(path: Path, fallback: list[str]) -> list[str]:
 
 def rebuild_library(path: Path, videos_dir: Path) -> RebuildResult:
     """Rebuild the library from per-video metadata without reading transcripts."""
-    previous = {str(video.get("id")): video for video in list_videos(path) if video.get("id")}
+    needs_backup = False
+    try:
+        previous_data, invalid_entries = _read_library(path)
+        needs_backup = bool(invalid_entries)
+    except InvalidLibraryError:
+        previous_data = _empty_library()
+        needs_backup = True
+    previous = {str(video.get("id")): video for video in previous_data["videos"] if video.get("id")}
     videos: list[dict[str, Any]] = []
     skipped: list[str] = []
     now = utc_now()
-    if not videos_dir.exists():
-        save_library(path, _empty_library())
-        return RebuildResult(0, skipped)
-
-    for video_dir in sorted(path for path in videos_dir.iterdir() if path.is_dir()):
-        info_path = video_dir / "info.json"
-        if not info_path.exists():
-            skipped.append(f"{video_dir.name}: falta info.json")
-            continue
-        try:
-            persisted = load_persisted_video(info_path, video_dir.name)
-            metadata = persisted.metadata
-            previous_entry = previous.get(metadata.id, {})
-            previous_tools = list(previous_entry.get("tools") or [])
-            videos.append(
-                _video_entry(
-                    metadata,
-                    video_dir,
-                    path,
-                    _tool_names_from_artifact(video_dir / "tools.json", previous_tools),
-                    previous_entry.get("created_at") or now,
-                    now,
+    if videos_dir.exists():
+        for video_dir in sorted(path for path in videos_dir.iterdir() if path.is_dir()):
+            info_path = video_dir / "info.json"
+            if not info_path.exists():
+                skipped.append(f"{video_dir.name}: falta info.json")
+                continue
+            try:
+                persisted = load_persisted_video(info_path, video_dir.name)
+                metadata = persisted.metadata
+                previous_entry = previous.get(metadata.id, {})
+                previous_tools = list(previous_entry.get("tools") or [])
+                videos.append(
+                    _video_entry(
+                        metadata,
+                        video_dir,
+                        path,
+                        _tool_names_from_artifact(video_dir / "tools.json", previous_tools),
+                        previous_entry.get("created_at") or now,
+                        now,
+                    )
                 )
-            )
-        except AppError as exc:
-            skipped.append(f"{video_dir.name}: {exc}")
+            except AppError as exc:
+                skipped.append(f"{video_dir.name}: {exc}")
 
     videos.sort(key=lambda item: item.get("updated_at") or "", reverse=True)
+    if needs_backup and path.exists() and path.stat().st_size:
+        try:
+            _backup_invalid_library(path)
+        except OSError as exc:
+            raise LibraryError(f"No se pudo respaldar la biblioteca inválida: {path}") from exc
     save_library(path, {"videos": videos})
     return RebuildResult(len(videos), skipped)

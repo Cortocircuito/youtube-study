@@ -10,7 +10,7 @@ Aplicación local para estudiar videos de YouTube a partir de sus subtítulos, s
 - Conserva la procedencia exacta de las respuestas por fragmento y añade referencias al instante del video en resúmenes, preguntas, tarjetas y Anki.
 - Mantiene una biblioteca local y permite listar, consultar, buscar, reanalizar y exportar videos.
 - Clasifica hallazgos como herramienta, protocolo, modelo, servicio o candidato heurístico.
-- Genera los artefactos en staging y usa un journal para recuperar la generación anterior tras fallos o interrupciones.
+- Genera todos los artefactos en staging y los reemplaza de forma atómica por archivo, sin modificar los subtítulos originales.
 
 ## Requisitos e instalación
 
@@ -66,6 +66,8 @@ python app.py export VIDEO_ID --format markdown|anki|all
 ```
 
 Los errores previstos —video inexistente, metadata local inválida, subtítulos no disponibles o argumentos no válidos— se imprimen sin traceback y el comando termina con código distinto de cero.
+
+Si una publicación se interrumpe, algunos archivos pueden pertenecer a generaciones distintas. Repite `study`, `analyze` o `export`, según corresponda, para completar la generación. Si `data/library.json` está dañado, los comandos de lectura no lo modifican: usa `python app.py rebuild-library`, que respalda el índice inválido antes de reconstruirlo desde `info.json` y `tools.json`.
 
 La descarga añade inglés como fallback cuando no figura entre los idiomas solicitados. La selección distingue subtítulos manuales, automáticos originales y traducciones usando la metadata de `yt-dlp`.
 
