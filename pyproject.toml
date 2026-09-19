@@ -8,6 +8,7 @@ select = ["E", "F", "I"]
 
 [tool.coverage.run]
 branch = true
+patch = ["subprocess"]
 source = ["src/youtube_study"]
 
 [tool.coverage.report]

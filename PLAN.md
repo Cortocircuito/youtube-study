@@ -11,7 +11,7 @@ La aplicación funciona localmente sin Ollama y permite:
 - Mantener `data/library.json` y usar `list`, `show`, `search`, `analyze`, `export` y `rebuild-library`.
 - Regenerar análisis antiguos al formato v2 sin red cuando los subtítulos ya están guardados.
 - Validar cambios mediante Ruff, compilación, pytest y GitHub Actions.
-- Medir cobertura de ramas en CI sin imponer todavía un umbral. La referencia local actual es 79 %; la medición de `cli.py` no incluye los subprocesos de sus pruebas funcionales.
+- Medir cobertura de ramas en CI sin imponer todavía un umbral. La referencia local actual es 87 %, incluyendo los subprocesos de las pruebas funcionales de CLI.
 
 ## Prioridades próximas sin IA
 

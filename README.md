@@ -28,6 +28,7 @@ Para ejecutar tests, lint y formato de desarrollo:
 pip install -r requirements-dev.txt
 python -m ruff check .
 python -m coverage run -m pytest
+python -m coverage combine
 python -m coverage report
 ```
 
@@ -111,6 +112,7 @@ python -m ruff format --check .
 python -m ruff check .
 python -m py_compile app.py src/youtube_study/*.py
 python -m coverage run -m pytest
+python -m coverage combine
 python -m coverage report
 ```
 

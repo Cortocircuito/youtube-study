@@ -132,6 +132,23 @@ def test_analyze_and_export_successfully_via_cli(tmp_path: Path) -> None:
     assert (video_dir / "anki.csv").exists()
 
 
+def test_analyze_accepts_video_id_starting_with_dash_after_separator(tmp_path: Path) -> None:
+    videos_dir = tmp_path / "videos"
+    video_dir = videos_dir / "-demo"
+    video_dir.mkdir(parents=True)
+    (video_dir / "-demo.es.vtt").write_text(
+        "WEBVTT\n\n00:00:01.000 --> 00:00:03.000\nTailscale permite usar SSH sin abrir puertos.\n",
+        encoding="utf-8",
+    )
+    (video_dir / "info.json").write_text(json.dumps({"id": "-demo", "title": "Demo con guion"}), encoding="utf-8")
+
+    analyzed = run_cli("analyze", "--out", str(videos_dir), "--", "-demo")
+
+    assert analyzed.returncode == 0
+    assert "Archivos regenerados" in analyzed.stdout
+    assert (video_dir / "study.md").exists()
+
+
 def test_url_shortcut_invokes_study_command(monkeypatch, tmp_path: Path, capsys) -> None:
     generated = tmp_path / "video"
     generated.mkdir()

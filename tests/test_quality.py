@@ -8,6 +8,7 @@ from src.youtube_study.analyzer import STOPWORDS, analyze_cues, cue_windows
 from src.youtube_study.transcript import Cue, clean_vtt
 
 FIXTURES = Path(__file__).parent / "fixtures"
+EVIDENCE_FIXTURE = FIXTURES / "evidence_provenance.vtt"
 CASES = {
     "gardening": {
         "path": FIXTURES / "quality_gardening.vtt",
@@ -132,17 +133,37 @@ def test_questions_and_cards_have_source_answers_and_timestamps() -> None:
 
 
 def test_practical_question_references_the_cue_containing_its_answer() -> None:
-    result = analyze_cues(
-        [
-            clean_vtt(CASES["gardening"]["path"])[0],
-            *clean_vtt(CASES["gardening"]["path"])[1:],
-        ]
-    )
+    result = analyze_cues(clean_vtt(CASES["gardening"]["path"]))
 
     for question in result.questions["practicas"]:
-        matching = [cue for cue in result.cues if normalized_tokens(question.answer) & normalized_tokens(cue.text)]
-        assert matching
-        assert question.timestamp in {cue.start for cue in matching}
+        referenced = next(cue for cue in result.cues if cue.start == question.timestamp)
+        assert question.answer in referenced.text
+
+
+def test_repeated_evidence_references_the_selected_occurrence_exactly() -> None:
+    cues = clean_vtt(EVIDENCE_FIXTURE)
+    repeated = "Primero revisa las métricas actuales antes de cambiar la configuración del servicio."
+
+    assert [(cue.start, cue.text) for cue in cues if cue.text == repeated] == [
+        ("00:00:10", repeated),
+        ("00:05:00", repeated),
+    ]
+
+    result = analyze_cues(cues)
+    question = next(item for item in result.questions["practicas"] if item.answer == repeated)
+
+    assert question.timestamp == "00:00:10"
+    assert question.source_excerpt == repeated
+
+
+def test_comprehension_answer_keeps_the_window_start_reference() -> None:
+    result = analyze_cues(clean_vtt(EVIDENCE_FIXTURE))
+    first_question = result.questions["comprension"][0]
+
+    assert first_question.timestamp == "00:00:01"
+    assert "La caché local" in first_question.answer
+    assert "Primero revisa las métricas" in first_question.answer
+    assert "Después compara la latencia" in first_question.answer
 
 
 def test_descriptive_content_does_not_invent_a_practical_recommendation() -> None:
