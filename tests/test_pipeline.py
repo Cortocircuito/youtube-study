@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 from pathlib import Path
 
 import pytest
 
+from src.youtube_study.artifacts import PUBLICATION_JOURNAL, recover_pending_publication
 from src.youtube_study.downloader import SubtitleSelection
-from src.youtube_study.errors import VideoDataError
+from src.youtube_study.errors import ArtifactRecoveryError, VideoDataError
 from src.youtube_study.service import analyze_existing, export_study, generate_study_files
 
 ARTIFACT_NAMES = {
@@ -194,7 +196,7 @@ def test_export_failure_preserves_existing_public_artifacts(monkeypatch, tmp_pat
     def fail_writer(*args, **kwargs) -> None:
         raise OSError("fallo de exportación")
 
-    monkeypatch.setattr("src.youtube_study.service.write_study_markdown_from_result", fail_writer)
+    monkeypatch.setattr("src.youtube_study.service.write_anki_csv", fail_writer)
 
     with pytest.raises(OSError, match="fallo de exportación"):
         export_study("demo", tmp_path / "videos", "es", "all")
@@ -256,7 +258,7 @@ def test_publish_failure_restores_previous_generation(monkeypatch, tmp_path: Pat
             raise OSError("fallo de publicación")
         original_replace(source, destination)
 
-    monkeypatch.setattr("src.youtube_study.service.os.replace", fail_while_publishing)
+    monkeypatch.setattr("src.youtube_study.artifacts.os.replace", fail_while_publishing)
 
     with pytest.raises(OSError, match="fallo de publicación"):
         generate_study_files({"id": "demo"}, video_dir, selection, tmp_path / "library.json")
@@ -283,7 +285,7 @@ def test_backup_failure_keeps_previous_artifact_bytes(monkeypatch, tmp_path: Pat
             raise OSError("fallo de respaldo")
         original_replace(source, destination)
 
-    monkeypatch.setattr("src.youtube_study.service.os.replace", fail_while_backing_up)
+    monkeypatch.setattr("src.youtube_study.artifacts.os.replace", fail_while_backing_up)
 
     with pytest.raises(OSError, match="fallo de respaldo"):
         generate_study_files({"id": "demo"}, video_dir, selection, tmp_path / "library.json")
@@ -291,6 +293,50 @@ def test_backup_failure_keeps_previous_artifact_bytes(monkeypatch, tmp_path: Pat
     assert summary_path.read_bytes() == previous
     assert not (video_dir / "info.json").exists()
     assert not list(video_dir.parent.glob(".demo.backup-*"))
+
+
+def test_journal_creation_failure_does_not_touch_previous_generation(monkeypatch, tmp_path: Path) -> None:
+    video_dir = tmp_path / "videos" / "demo"
+    video_dir.mkdir(parents=True)
+    subtitle_path = video_dir / "demo.es.vtt"
+    write_demo_vtt(subtitle_path)
+    summary_path = video_dir / "summary.md"
+    previous = b"resultado anterior"
+    summary_path.write_bytes(previous)
+    selection = SubtitleSelection(subtitle_path, "es", "manual", "test")
+    original_replace = os.replace
+
+    def fail_journal_replace(source, destination) -> None:
+        if Path(destination).name == PUBLICATION_JOURNAL:
+            raise OSError("fallo de journal")
+        original_replace(source, destination)
+
+    monkeypatch.setattr("src.youtube_study.artifacts.os.replace", fail_journal_replace)
+
+    with pytest.raises(OSError, match="fallo de journal"):
+        generate_study_files({"id": "demo"}, video_dir, selection, tmp_path / "library.json")
+
+    assert summary_path.read_bytes() == previous
+    assert not (video_dir / PUBLICATION_JOURNAL).exists()
+    assert not list(video_dir.parent.glob(".demo.backup-*"))
+
+
+def test_invalid_pending_journal_blocks_overwrite_and_preserves_previous_bytes(tmp_path: Path) -> None:
+    video_dir = tmp_path / "videos" / "demo"
+    video_dir.mkdir(parents=True)
+    subtitle_path = video_dir / "demo.es.vtt"
+    write_demo_vtt(subtitle_path)
+    summary_path = video_dir / "summary.md"
+    previous = b"resultado anterior"
+    summary_path.write_bytes(previous)
+    (video_dir / PUBLICATION_JOURNAL).write_text("{", encoding="utf-8")
+    selection = SubtitleSelection(subtitle_path, "es", "manual", "test")
+
+    with pytest.raises(ArtifactRecoveryError, match="No se pudo leer el journal"):
+        generate_study_files({"id": "demo"}, video_dir, selection, tmp_path / "library.json")
+
+    assert summary_path.read_bytes() == previous
+    assert (video_dir / PUBLICATION_JOURNAL).exists()
 
 
 def test_restore_failure_preserves_backup_with_previous_bytes(monkeypatch, tmp_path: Path) -> None:
@@ -312,9 +358,9 @@ def test_restore_failure_preserves_backup_with_previous_bytes(monkeypatch, tmp_p
             raise OSError("fallo de restauración")
         original_replace(source, destination)
 
-    monkeypatch.setattr("src.youtube_study.service.os.replace", fail_publish_and_restore)
+    monkeypatch.setattr("src.youtube_study.artifacts.os.replace", fail_publish_and_restore)
 
-    with pytest.raises(VideoDataError, match="Respaldo conservado en"):
+    with pytest.raises(ArtifactRecoveryError, match="Journal conservado en"):
         generate_study_files({"id": "demo"}, video_dir, selection, tmp_path / "library.json")
 
     backup_dirs = list(video_dir.parent.glob(".demo.backup-*"))
@@ -339,14 +385,69 @@ def test_cleanup_failure_after_rollback_does_not_lose_previous_generation(monkey
             raise OSError("fallo de publicación")
         original_replace(source, destination)
 
-    monkeypatch.setattr("src.youtube_study.service.os.replace", fail_while_publishing)
-    monkeypatch.setattr("src.youtube_study.service.shutil.rmtree", lambda *args, **kwargs: None)
+    monkeypatch.setattr("src.youtube_study.artifacts.os.replace", fail_while_publishing)
+    monkeypatch.setattr("src.youtube_study.artifacts.shutil.rmtree", lambda *args, **kwargs: None)
 
-    with pytest.raises(OSError, match="fallo de publicación"):
+    with pytest.raises(ArtifactRecoveryError, match="Journal conservado en"):
         generate_study_files({"id": "demo"}, video_dir, selection, tmp_path / "library.json")
 
     assert {name: (video_dir / name).read_bytes() for name in previous} == previous
     assert len(list(video_dir.parent.glob(".demo.backup-*"))) == 1
+    assert (video_dir / PUBLICATION_JOURNAL).exists()
+
+
+def test_interrupted_publication_can_be_recovered_from_journal(monkeypatch, tmp_path: Path) -> None:
+    video_dir = tmp_path / "videos" / "demo"
+    video_dir.mkdir(parents=True)
+    subtitle_path = video_dir / "demo.es.vtt"
+    write_demo_vtt(subtitle_path)
+    previous = {"info.json": b'{"id":"anterior"}', "summary.md": b"resultado anterior"}
+    for name, content in previous.items():
+        (video_dir / name).write_bytes(content)
+    selection = SubtitleSelection(subtitle_path, "es", "manual", "test")
+    original_replace = os.replace
+
+    def interrupt_while_publishing(source, destination) -> None:
+        source_path = Path(source)
+        if source_path.name == "summary.md" and ".staging-" in source_path.parent.name:
+            raise KeyboardInterrupt
+        original_replace(source, destination)
+
+    monkeypatch.setattr("src.youtube_study.artifacts.os.replace", interrupt_while_publishing)
+
+    with pytest.raises(KeyboardInterrupt):
+        generate_study_files({"id": "demo"}, video_dir, selection, tmp_path / "library.json")
+
+    assert (video_dir / PUBLICATION_JOURNAL).exists()
+    monkeypatch.setattr("src.youtube_study.artifacts.os.replace", original_replace)
+
+    assert recover_pending_publication(video_dir) is True
+    assert {name: (video_dir / name).read_bytes() for name in previous} == previous
+    assert not (video_dir / PUBLICATION_JOURNAL).exists()
+    assert not list(video_dir.parent.glob(".demo.backup-*"))
+
+
+def test_committed_publication_survives_interrupted_cleanup(monkeypatch, tmp_path: Path) -> None:
+    video_dir = tmp_path / "videos" / "demo"
+    video_dir.mkdir(parents=True)
+    subtitle_path = video_dir / "demo.es.vtt"
+    write_demo_vtt(subtitle_path)
+    selection = SubtitleSelection(subtitle_path, "es", "manual", "test")
+    original_rmtree = shutil.rmtree
+
+    monkeypatch.setattr("src.youtube_study.artifacts.shutil.rmtree", lambda *args, **kwargs: None)
+
+    with pytest.raises(ArtifactRecoveryError, match="limpieza quedó pendiente"):
+        generate_study_files({"id": "demo"}, video_dir, selection, tmp_path / "library.json")
+
+    published_summary = (video_dir / "summary.md").read_bytes()
+    assert (video_dir / PUBLICATION_JOURNAL).exists()
+    monkeypatch.setattr("src.youtube_study.artifacts.shutil.rmtree", original_rmtree)
+
+    assert recover_pending_publication(video_dir) is True
+    assert (video_dir / "summary.md").read_bytes() == published_summary
+    assert not (video_dir / PUBLICATION_JOURNAL).exists()
+    assert not list(video_dir.parent.glob(".demo.backup-*"))
 
 
 def test_library_failure_happens_after_complete_generation_is_published(monkeypatch, tmp_path: Path) -> None:

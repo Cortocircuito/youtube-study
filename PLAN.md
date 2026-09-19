@@ -11,6 +11,7 @@ La aplicación funciona localmente sin Ollama y permite:
 - Mantener `data/library.json` y usar `list`, `show`, `search`, `analyze`, `export` y `rebuild-library`.
 - Regenerar análisis antiguos al formato v2 sin red cuando los subtítulos ya están guardados.
 - Propagar evidencia extractiva con posiciones y rangos exactos desde los captions hasta preguntas y tarjetas.
+- Publicar generaciones y exportaciones desde staging con journal, rollback y recuperación tras interrupciones.
 - Validar cambios mediante Ruff, compilación, pytest y GitHub Actions.
 - Medir cobertura de ramas en CI sin imponer todavía un umbral. La referencia local actual es 87 %, incluyendo los subprocesos de las pruebas funcionales de CLI.
 

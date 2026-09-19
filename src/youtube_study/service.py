@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import json
-import os
-import shutil
-import tempfile
 from pathlib import Path
 
 from .analyzer import analyze_cues
+from .artifacts import publish_artifacts, recover_pending_publication, staging_directory
 from .downloader import SubtitleSelection, choose_subtitle, download_subtitles
 from .errors import VideoDataError
 from .exporter import (
@@ -52,11 +50,15 @@ def requested_languages(languages: str) -> list[str]:
     return [language.strip() for language in languages.split(",") if language.strip()]
 
 
-def _write_study_files(info: VideoInfo, output_dir: Path, subtitle: SubtitleSelection) -> AnalysisResult:
-    video_id = info["id"]
+def _analyze_subtitle(subtitle: SubtitleSelection) -> AnalysisResult:
     result = analyze_cues(clean_vtt(subtitle.path))
     if not result.cues:
         raise VideoDataError(f"El subtítulo seleccionado no contiene texto utilizable: {subtitle.path}")
+    return result
+
+
+def _render_study_files(info: VideoInfo, output_dir: Path, subtitle: SubtitleSelection, result: AnalysisResult) -> None:
+    video_id = info["id"]
     title = info.get("title", video_id)
     source_url = info.get("webpage_url")
 
@@ -74,53 +76,17 @@ def _write_study_files(info: VideoInfo, output_dir: Path, subtitle: SubtitleSele
     write_study_guide(output_dir / "study-guide.md", title, result.tools, result.questions)
     write_study_markdown_from_result(output_dir / "study.md", title, result, source_url)
     write_anki_csv(output_dir / "anki.csv", result.cards, video_id, info.get("uploader"), source_url)
-    return result
-
-
-def _publish_staged_files(staging_dir: Path, video_dir: Path) -> None:
-    """Publish one complete generation and restore previous files if replacement fails."""
-    video_dir.mkdir(parents=True, exist_ok=True)
-    backup_dir = Path(tempfile.mkdtemp(prefix=f".{video_dir.name}.backup-", dir=video_dir.parent))
-    published: list[str] = []
-    backed_up: list[str] = []
-    keep_backup = False
-    try:
-        for name in GENERATED_ARTIFACTS:
-            destination = video_dir / name
-            if destination.exists():
-                os.replace(destination, backup_dir / name)
-                backed_up.append(name)
-        for name in GENERATED_ARTIFACTS:
-            os.replace(staging_dir / name, video_dir / name)
-            published.append(name)
-    except OSError:
-        for name in published:
-            (video_dir / name).unlink(missing_ok=True)
-        try:
-            for name in backed_up:
-                backup = backup_dir / name
-                if backup.exists():
-                    os.replace(backup, video_dir / name)
-        except OSError as rollback_error:
-            keep_backup = True
-            raise VideoDataError(
-                f"Falló la publicación y no se pudo restaurar completamente. Respaldo conservado en {backup_dir}"
-            ) from rollback_error
-        raise
-    finally:
-        if not keep_backup:
-            shutil.rmtree(backup_dir, ignore_errors=True)
 
 
 def generate_study_files(info: VideoInfo, video_dir: Path, subtitle: SubtitleSelection, library_path: Path) -> Path:
     video_id = info.get("id")
     if not video_id:
         raise VideoDataError("No se puede analizar un video sin id.")
-    video_dir.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix=f".{video_id}.staging-", dir=video_dir.parent) as temp_dir:
-        staging_dir = Path(temp_dir)
-        result = _write_study_files(info, staging_dir, subtitle)
-        _publish_staged_files(staging_dir, video_dir)
+    recover_pending_publication(video_dir)
+    result = _analyze_subtitle(subtitle)
+    with staging_directory(video_dir) as staging_dir:
+        _render_study_files(info, staging_dir, subtitle, result)
+        publish_artifacts(staging_dir, video_dir, GENERATED_ARTIFACTS)
 
     upsert_video(library_path, info, video_dir, result.tools)
     return video_dir
@@ -140,6 +106,7 @@ def load_existing_video(video_id: str, out: Path, languages: str) -> tuple[Video
     video_dir = out / video_id
     if not video_dir.exists():
         raise VideoDataError(f"No existe el directorio del video: {video_dir}")
+    recover_pending_publication(video_dir)
     info_path = video_dir / "info.json"
     if not info_path.exists():
         raise VideoDataError(f"No existe info.json para {video_id}: {info_path}")
@@ -161,16 +128,17 @@ def analyze_existing(video_id: str, out: Path, languages: str) -> Path:
 
 def export_study(video_id: str, out: Path, languages: str, export_format: str) -> list[Path]:
     info, video_dir, subtitle = load_existing_video(video_id, out, languages)
-    result = analyze_cues(clean_vtt(subtitle.path))
+    result = _analyze_subtitle(subtitle)
     title = info.get("title", video_id)
     source_url = info.get("webpage_url")
-    written: list[Path] = []
-    if export_format in {"markdown", "all"}:
-        study_path = video_dir / "study.md"
-        write_study_markdown_from_result(study_path, title, result, source_url)
-        written.append(study_path)
-    if export_format in {"anki", "all"}:
-        anki_path = video_dir / "anki.csv"
-        write_anki_csv(anki_path, result.cards, video_id, info.get("uploader"), source_url)
-        written.append(anki_path)
-    return written
+    names: list[str] = []
+    with staging_directory(video_dir) as staging_dir:
+        if export_format in {"markdown", "all"}:
+            write_study_markdown_from_result(staging_dir / "study.md", title, result, source_url)
+            names.append("study.md")
+        if export_format in {"anki", "all"}:
+            write_anki_csv(staging_dir / "anki.csv", result.cards, video_id, info.get("uploader"), source_url)
+            names.append("anki.csv")
+        if names:
+            publish_artifacts(staging_dir, video_dir, names)
+    return [video_dir / name for name in names]

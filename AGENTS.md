@@ -71,6 +71,8 @@ src/youtube_study/service.py     # pipeline study, analyze y export
 src/youtube_study/downloader.py  # descarga subtítulos con yt-dlp
 src/youtube_study/transcript.py  # limpieza y transformación de VTT
 src/youtube_study/analyzer.py    # análisis heurístico
+src/youtube_study/study_models.py # modelos de evidencia y resultados
+src/youtube_study/artifacts.py    # staging, publicación y recuperación
 src/youtube_study/tool_catalog.* # catálogo versionado de herramientas
 src/youtube_study/library.py     # biblioteca local
 src/youtube_study/search.py      # búsqueda en transcripciones

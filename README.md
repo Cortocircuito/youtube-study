@@ -10,7 +10,7 @@ Aplicación local para estudiar videos de YouTube a partir de sus subtítulos, s
 - Conserva la procedencia exacta de las respuestas por fragmento y añade referencias al instante del video en resúmenes, preguntas, tarjetas y Anki.
 - Mantiene una biblioteca local y permite listar, consultar, buscar, reanalizar y exportar videos.
 - Clasifica hallazgos como herramienta, protocolo, modelo, servicio o candidato heurístico.
-- Genera primero los artefactos en staging y conserva la generación anterior si el análisis o una escritura falla.
+- Genera los artefactos en staging y usa un journal para recuperar la generación anterior tras fallos o interrupciones.
 
 ## Requisitos e instalación
 
