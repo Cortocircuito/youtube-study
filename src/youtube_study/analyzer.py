@@ -4,10 +4,22 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 
+from .study_models import ANALYSIS_FORMAT_VERSION as _ANALYSIS_FORMAT_VERSION
+from .study_models import (
+    AnalysisResult,
+    ConceptMention,
+    Flashcard,
+    SourceExcerpt,
+    SourceFragment,
+    StudyIdea,
+    StudyQuestion,
+    ToolMention,
+    flatten_questions,
+)
 from .tool_catalog import TOOL_CATALOG, UNKNOWN_CANDIDATE_EXCLUSIONS
 from .transcript import Cue, chunk_by_minutes, normalize_aliases, seconds_from_timestamp
 
-ANALYSIS_FORMAT_VERSION = 2
+ANALYSIS_FORMAT_VERSION = _ANALYSIS_FORMAT_VERSION
 
 STOPWORDS = set(
     """
@@ -22,59 +34,18 @@ STOPWORDS = set(
 )
 
 
-@dataclass
-class ToolMention:
-    name: str
-    count: int
-    description: str
-    category: str = "tool"
-    kind: str = "known"
-
-
-@dataclass
-class ConceptMention:
-    name: str
-    score: int
-    count: int
-    timestamps: list[str]
-
-
 @dataclass(frozen=True)
 class TextWindow:
-    timestamp: str
-    text: str
+    evidence: SourceExcerpt
     position: int
 
+    @property
+    def timestamp(self) -> str:
+        return self.evidence.timestamp
 
-@dataclass(frozen=True)
-class StudyQuestion:
-    question: str
-    answer: str
-    timestamp: str
-    source_excerpt: str
-    category: str
-
-
-@dataclass(frozen=True)
-class Flashcard:
-    question: str
-    answer: str
-    timestamp: str
-    source_excerpt: str
-    tags: str
-
-
-@dataclass
-class AnalysisResult:
-    cues: list[Cue]
-    keywords: list[tuple[str, int]]
-    tools: list[ToolMention]
-    ideas: list[tuple[str, str]]
-    sections: list[tuple[str, str, list[str]]]
-    concepts: list[ConceptMention]
-    questions: dict[str, list[StudyQuestion]]
-    cards: list[Flashcard]
-    format_version: int = ANALYSIS_FORMAT_VERSION
+    @property
+    def text(self) -> str:
+        return self.evidence.text
 
 
 def full_text(cues: list[Cue]) -> str:
@@ -180,23 +151,66 @@ def deduplicate_texts(texts: list[str], threshold: float = 0.72) -> list[str]:
     return unique
 
 
+def source_excerpt_from_cues(indexed_cues: list[tuple[int, Cue]]) -> SourceExcerpt:
+    fragments = tuple(
+        SourceFragment(
+            cue_index=cue_index,
+            timestamp=cue.start,
+            start=0,
+            end=len(cue.text),
+            text=cue.text,
+        )
+        for cue_index, cue in indexed_cues
+    )
+    return SourceExcerpt(" ".join(fragment.text for fragment in fragments), fragments)
+
+
+def slice_source_excerpt(evidence: SourceExcerpt, text: str) -> SourceExcerpt:
+    """Select an exact substring while retaining its source cue ranges."""
+    selection_start = evidence.text.find(text)
+    if selection_start < 0:
+        raise ValueError("El texto seleccionado no pertenece al extracto fuente")
+    selection_end = selection_start + len(text)
+    fragments: list[SourceFragment] = []
+    cursor = 0
+    for fragment in evidence.fragments:
+        fragment_start = cursor
+        fragment_end = fragment_start + len(fragment.text)
+        overlap_start = max(selection_start, fragment_start)
+        overlap_end = min(selection_end, fragment_end)
+        if overlap_start < overlap_end:
+            local_start = overlap_start - fragment_start
+            local_end = overlap_end - fragment_start
+            fragments.append(
+                SourceFragment(
+                    cue_index=fragment.cue_index,
+                    timestamp=fragment.timestamp,
+                    start=fragment.start + local_start,
+                    end=fragment.start + local_end,
+                    text=fragment.text[local_start:local_end],
+                )
+            )
+        cursor = fragment_end + 1
+    return SourceExcerpt(text, tuple(fragments))
+
+
 def cue_windows(cues: list[Cue], size: int = 3) -> list[TextWindow]:
     """Build chronological, non-overlapping windows while dropping near-duplicate cues."""
-    unique_cues: list[Cue] = []
-    for cue in cues:
+    unique_cues: list[tuple[int, Cue]] = []
+    for cue_index, cue in enumerate(cues):
         if any(
             abs(seconds_from_timestamp(cue.start) - seconds_from_timestamp(previous.start)) <= 15
             and token_similarity(cue.text, previous.text) >= 0.72
-            for previous in unique_cues[-8:]
+            for _, previous in unique_cues[-8:]
         ):
             continue
-        unique_cues.append(cue)
+        unique_cues.append((cue_index, cue))
 
     windows: list[TextWindow] = []
     for index in range(0, len(unique_cues), size):
         chunk = unique_cues[index : index + size]
         if chunk:
-            windows.append(TextWindow(chunk[0].start, " ".join(cue.text for cue in chunk), index))
+            windows.append(TextWindow(source_excerpt_from_cues(chunk), index))
     return windows
 
 
@@ -226,7 +240,7 @@ def representative_sentences(text: str, limit: int = 3) -> list[str]:
     return [sentence for _, sentence in chosen]
 
 
-def important_ideas(cues: list[Cue], limit: int = 12) -> list[tuple[str, str]]:
+def important_ideas(cues: list[Cue], limit: int = 12) -> list[StudyIdea]:
     windows = cue_windows(cues)
     frequencies = dict(keywords(full_text(cues), 25))
     scored = [(text_score(window.text, frequencies, window.position), window) for window in windows]
@@ -238,7 +252,7 @@ def important_ideas(cues: list[Cue], limit: int = 12) -> list[tuple[str, str]]:
         selected.append(window)
         if len(selected) >= limit:
             break
-    return [(window.timestamp, window.text) for window in sorted(selected, key=lambda item: item.position)]
+    return [StudyIdea(window.evidence) for window in sorted(selected, key=lambda item: item.position)]
 
 
 def section_summaries(cues: list[Cue], minutes: int = 5) -> list[tuple[str, str, list[str]]]:
@@ -267,19 +281,24 @@ def concept_mentions(cues: list[Cue], limit: int = 20) -> list[ConceptMention]:
     return sorted(concepts, key=lambda item: item.score, reverse=True)
 
 
-def source_cue(cues: list[Cue], term: str) -> Cue | None:
+def source_excerpt_for_term(cues: list[Cue], term: str) -> SourceExcerpt | None:
     pattern = re.compile(r"(?<![\w.-])" + re.escape(term) + r"(?![\w.-])", re.IGNORECASE)
-    matches = [cue for cue in cues if pattern.search(cue.text)]
+    matches = [(cue_index, cue) for cue_index, cue in enumerate(cues) if pattern.search(cue.text)]
     if not matches:
         return None
     explanation = re.compile(
         r"\b(?:es|son|permite|sirve|consiste|significa|funciona|se usa|se utiliza|ayuda|protege|conecta)\b",
         re.IGNORECASE,
     )
-    return max(
+    selected = max(
         enumerate(matches),
-        key=lambda item: (bool(explanation.search(item[1].text)), len(content_tokens(item[1].text)), -item[0]),
+        key=lambda item: (
+            bool(explanation.search(item[1][1].text)),
+            len(content_tokens(item[1][1].text)),
+            -item[0],
+        ),
     )[1]
+    return source_excerpt_from_cues([selected])
 
 
 def question_key(question: str) -> str:
@@ -308,50 +327,38 @@ def question_topic(text: str, excluded: set[str] | None = None) -> str:
     return next((word for word, _ in keywords(text, 8) if word not in ignored), "este tema")
 
 
-def practical_excerpt(idea: str) -> str | None:
-    sentences = split_sentences(idea)
+def practical_excerpt(evidence: SourceExcerpt) -> SourceExcerpt | None:
+    sentences = split_sentences(evidence.text)
     action_pattern = re.compile(
         r"\b(?:debe|debería|conviene|primero|evita|revisa|compara|ajusta|deja|riega|hay que|no conviene)\b",
         re.IGNORECASE,
     )
-    return next((sentence for sentence in sentences if action_pattern.search(sentence)), None)
-
-
-def timestamp_for_excerpt(cues: list[Cue], excerpt: str, fallback: str) -> str:
-    excerpt_tokens = content_tokens(excerpt)
-    if not excerpt_tokens:
-        return fallback
-    matching = [
-        (len(excerpt_tokens & content_tokens(cue.text)) / len(excerpt_tokens), cue)
-        for cue in cues
-        if content_tokens(cue.text)
-    ]
-    score, cue = max(matching, default=(0.0, None), key=lambda item: item[0])
-    return cue.start if cue is not None and score >= 0.5 else fallback
+    sentence = next((sentence for sentence in sentences if action_pattern.search(sentence)), None)
+    return slice_source_excerpt(evidence, sentence) if sentence else None
 
 
 def questions(
     cues: list[Cue],
     tools: list[ToolMention],
     concepts: list[ConceptMention],
-    ideas: list[tuple[str, str]],
+    ideas: list[StudyIdea],
     limit: int = 10,
 ) -> dict[str, list[StudyQuestion]]:
     groups: dict[str, list[StudyQuestion]] = {"basicas": [], "comprension": [], "practicas": []}
     seen: set[str] = set()
 
-    def add(category: str, question: str, answer: str, timestamp: str, excerpt: str) -> None:
+    def add(category: str, question: str, evidence: SourceExcerpt) -> None:
         key = question_key(question)
-        if not answer.strip() or not timestamp or key in seen or len(groups[category]) >= limit:
+        if key in seen or len(groups[category]) >= limit:
             return
         seen.add(key)
-        groups[category].append(StudyQuestion(question, answer.strip(), timestamp, excerpt.strip(), category))
+        groups[category].append(StudyQuestion(question, evidence, category))
 
     used_topics: set[str] = set()
     for tool in tools[:4]:
-        cue = source_cue(cues, tool.name)
-        if cue:
-            add("basicas", f"¿Qué se explica sobre {tool.name}?", cue.text, cue.start, cue.text)
+        evidence = source_excerpt_for_term(cues, tool.name)
+        if evidence:
+            add("basicas", f"¿Qué se explica sobre {tool.name}?", evidence)
             used_topics.add(tool.name.lower())
 
     for concept in concepts:
@@ -359,40 +366,30 @@ def questions(
             break
         if concept.name in used_topics or concept.name in QUESTION_TOPIC_EXCLUSIONS:
             continue
-        cue = source_cue(cues, concept.name)
-        if cue:
-            add("basicas", f"¿Qué se explica sobre {concept.name}?", cue.text, cue.start, cue.text)
+        evidence = source_excerpt_for_term(cues, concept.name)
+        if evidence:
+            add("basicas", f"¿Qué se explica sobre {concept.name}?", evidence)
             used_topics.add(concept.name)
 
-    for timestamp, idea in ideas[:4]:
-        topic = question_topic(idea, used_topics)
+    for idea in ideas[:4]:
+        topic = question_topic(idea.text, used_topics)
         add(
             "comprension",
             f"¿Cuál es la idea principal relacionada con {topic}?",
-            idea,
-            timestamp,
-            idea,
+            idea.evidence,
         )
         used_topics.add(topic)
 
-    practical_candidates = [
-        (timestamp, excerpt) for timestamp, idea in ideas if (excerpt := practical_excerpt(idea)) is not None
-    ]
-    for timestamp, excerpt in practical_candidates[-3:]:
-        topic = question_topic(excerpt)
+    practical_candidates = [excerpt for idea in ideas if (excerpt := practical_excerpt(idea.evidence)) is not None]
+    for excerpt in practical_candidates[-3:]:
+        topic = question_topic(excerpt.text)
         add(
             "practicas",
             f"¿Qué recomendación o criterio práctico se presenta sobre {topic}?",
             excerpt,
-            timestamp_for_excerpt(cues, excerpt, timestamp),
-            excerpt,
         )
 
     return groups
-
-
-def flatten_questions(qs: dict[str, list[StudyQuestion]]) -> list[StudyQuestion]:
-    return [question for group in qs.values() for question in group]
 
 
 def flashcards(tools: list[ToolMention], qs: dict[str, list[StudyQuestion]]) -> list[Flashcard]:
@@ -406,9 +403,7 @@ def flashcards(tools: list[ToolMention], qs: dict[str, list[StudyQuestion]]) -> 
         cards.append(
             Flashcard(
                 question=item.question,
-                answer=item.answer,
-                timestamp=item.timestamp,
-                source_excerpt=item.source_excerpt,
+                evidence=item.evidence,
                 tags=tags,
             )
         )

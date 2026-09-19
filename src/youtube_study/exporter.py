@@ -9,11 +9,12 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from .analyzer import (
+from .study_models import (
     ANALYSIS_FORMAT_VERSION,
     AnalysisResult,
     ConceptMention,
     Flashcard,
+    StudyIdea,
     StudyQuestion,
     ToolMention,
     flatten_questions,
@@ -152,14 +153,14 @@ def write_summary(
     path: Path,
     title: str,
     keywords: list[tuple[str, int]],
-    ideas: list[tuple[str, str]],
+    ideas: list[StudyIdea],
     sections: list[tuple[str, str, list[str]]],
     source_url: str | None = None,
 ) -> None:
     lines = [f"# Resumen de estudio: {title}", "", "## Palabras clave", ""]
     lines += [f"- {w}: {n}" for w, n in keywords[:15]]
     lines += ["", "## Ideas importantes con timestamp", ""]
-    lines += [f"- {markdown_reference(ts, source_url)} {idea}" for ts, idea in ideas]
+    lines += [f"- {markdown_reference(idea.timestamp, source_url)} {idea.text}" for idea in ideas]
     lines += ["", "## Resumen por bloques", ""]
     for time_range, topic, block_ideas in sections:
         lines += [f"### {time_range}", f"Tema aproximado: {topic or 'N/D'}", ""]
@@ -207,7 +208,7 @@ def write_study_markdown_from_result(
     lines += ["## Resumen", "", "### Palabras clave", ""]
     lines += [f"- {word}: {count}" for word, count in result.keywords[:15]] or ["Sin palabras clave."]
     lines += ["", "### Ideas importantes", ""]
-    lines += [f"- {markdown_reference(timestamp, source_url)} {idea}" for timestamp, idea in result.ideas] or [
+    lines += [f"- {markdown_reference(idea.timestamp, source_url)} {idea.text}" for idea in result.ideas] or [
         "Sin ideas generadas."
     ]
     lines.append("")

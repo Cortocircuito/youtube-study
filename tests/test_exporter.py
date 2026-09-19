@@ -4,13 +4,14 @@ import csv
 import json
 from pathlib import Path
 
-from src.youtube_study.analyzer import Flashcard, analyze_cues
+from src.youtube_study.analyzer import analyze_cues
 from src.youtube_study.exporter import (
     markdown_reference,
     timestamp_url,
     write_anki_csv,
     write_study_markdown_from_result,
 )
+from src.youtube_study.study_models import Flashcard, SourceExcerpt, SourceFragment
 from src.youtube_study.transcript import Cue
 
 
@@ -40,7 +41,11 @@ def test_timestamp_url_preserves_query_replaces_time_and_supports_fallback() -> 
 
 def test_anki_csv_adds_clickable_reference_without_changing_columns(tmp_path: Path) -> None:
     path = tmp_path / "anki.csv"
-    card = Flashcard("Pregunta", "Respuesta", "00:01:23", "Fuente", "question type::basicas")
+    evidence = SourceExcerpt(
+        "Respuesta",
+        (SourceFragment(cue_index=0, timestamp="00:01:23", start=0, end=9, text="Respuesta"),),
+    )
+    card = Flashcard("Pregunta", evidence, "question type::basicas")
 
     write_anki_csv(path, [card], "demo", source_url="https://youtu.be/abc?si=share")
 

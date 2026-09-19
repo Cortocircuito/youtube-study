@@ -6,7 +6,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from .analyzer import AnalysisResult, analyze_cues
+from .analyzer import analyze_cues
 from .downloader import SubtitleSelection, choose_subtitle, download_subtitles
 from .errors import VideoDataError
 from .exporter import (
@@ -27,6 +27,7 @@ from .exporter import (
 )
 from .library import library_path_from_videos_dir, upsert_video
 from .models import VideoInfo
+from .study_models import AnalysisResult
 from .transcript import clean_vtt
 
 GENERATED_ARTIFACTS = (

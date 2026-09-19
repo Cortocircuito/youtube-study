@@ -10,9 +10,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .analyzer import ToolMention
 from .errors import AppError
 from .models import LibraryEntry, VideoInfo
+from .study_models import ToolMention
 
 
 class LibraryError(AppError):

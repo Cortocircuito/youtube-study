@@ -82,7 +82,7 @@ def test_quality_fixtures_are_distinct_and_preserve_known_timestamps() -> None:
 def test_current_analysis_finds_expected_topics_without_domain_specific_setup() -> None:
     for case in CASES.values():
         result = analyze_cues(clean_vtt(case["path"]))
-        selected_text = " ".join(text.lower() for _, text in result.ideas)
+        selected_text = " ".join(idea.text.lower() for idea in result.ideas)
 
         assert result.ideas
         assert len(case["terms"] & normalized_tokens(selected_text)) >= 2
@@ -102,8 +102,8 @@ def test_selected_ideas_do_not_repeat_near_identical_sentences() -> None:
     result = analyze_cues(clean_vtt(CASES["gardening"]["path"]))
     sentences = [
         sentence.strip()
-        for _, idea in result.ideas
-        for sentence in re.split(r"(?<=[.!?])\s+", idea)
+        for idea in result.ideas
+        for sentence in re.split(r"(?<=[.!?])\s+", idea.text)
         if sentence.strip()
     ]
 
@@ -122,6 +122,7 @@ def test_questions_and_cards_have_source_answers_and_timestamps() -> None:
     assert cards
     assert referenced_answer_ratio(questions) == 1.0
     assert referenced_answer_ratio(cards) == 1.0
+    assert [card.evidence for card in cards] == [question.evidence for question in questions]
 
     for result in results:
         normalized_questions = [
@@ -152,8 +153,11 @@ def test_repeated_evidence_references_the_selected_occurrence_exactly() -> None:
     result = analyze_cues(cues)
     question = next(item for item in result.questions["practicas"] if item.answer == repeated)
 
-    assert question.timestamp == "00:00:10"
+    assert question.timestamp == "00:05:00"
     assert question.source_excerpt == repeated
+    assert question.evidence.cue_positions == (3,)
+    assert question.evidence.fragments[0].start == 0
+    assert question.evidence.fragments[0].end == len(repeated)
 
 
 def test_comprehension_answer_keeps_the_window_start_reference() -> None:
@@ -161,9 +165,43 @@ def test_comprehension_answer_keeps_the_window_start_reference() -> None:
     first_question = result.questions["comprension"][0]
 
     assert first_question.timestamp == "00:00:01"
+    assert first_question.evidence.cue_positions == (0, 1, 2)
     assert "La caché local" in first_question.answer
     assert "Primero revisa las métricas" in first_question.answer
     assert "Después compara la latencia" in first_question.answer
+
+
+def test_evidence_keeps_exact_offsets_for_a_sentence_inside_one_cue() -> None:
+    recommendation = "Primero revisa las métricas antes de cambiar la configuración del servicio."
+    cue = Cue(
+        "00:01:00",
+        f"El panel presenta los datos observados durante la ejecución anterior. {recommendation}",
+    )
+
+    result = analyze_cues([cue])
+    question = next(item for item in result.questions["practicas"] if item.answer == recommendation)
+    fragment = question.evidence.fragments[0]
+    expected_start = cue.text.index(recommendation)
+
+    assert question.timestamp == cue.start
+    assert fragment.cue_index == 0
+    assert fragment.start == expected_start
+    assert fragment.end == expected_start + len(recommendation)
+    assert cue.text[fragment.start : fragment.end] == fragment.text == recommendation
+
+
+def test_sentence_split_across_cues_keeps_every_source_fragment() -> None:
+    first_part = "Primero revisa las métricas actuales"
+    second_part = "antes de cambiar la configuración del servicio para evitar una regresión inesperada."
+    result = analyze_cues([Cue("00:02:00", first_part), Cue("00:02:04", second_part)])
+    question = next(item for item in result.questions["practicas"] if item.answer.startswith(first_part))
+
+    assert question.timestamp == "00:02:00"
+    assert question.evidence.cue_positions == (0, 1)
+    assert [(fragment.start, fragment.end, fragment.text) for fragment in question.evidence.fragments] == [
+        (0, len(first_part), first_part),
+        (0, len(second_part), second_part),
+    ]
 
 
 def test_descriptive_content_does_not_invent_a_practical_recommendation() -> None:

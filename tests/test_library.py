@@ -4,8 +4,8 @@ import unittest
 import warnings
 from pathlib import Path
 
-from src.youtube_study.analyzer import ToolMention
 from src.youtube_study.library import get_video, load_library, rebuild_library, resolve_video_path, upsert_video
+from src.youtube_study.study_models import ToolMention
 
 
 class LibraryTests(unittest.TestCase):
