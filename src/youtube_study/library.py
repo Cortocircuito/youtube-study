@@ -211,6 +211,11 @@ def _video_entry(
     }
 
 
+def _same_library_content(left: LibraryEntry, right: LibraryEntry) -> bool:
+    fields = ("id", "title", "channel", "duration", "url", "path", "tools")
+    return all(left.get(field) == right.get(field) for field in fields)
+
+
 def upsert_video(path: Path, metadata: VideoMetadata, video_dir: Path, tools: list[ToolMention]) -> LibraryEntry:
     """Insert or update one video in the local library, deduplicated by id."""
     data, invalid_entries = _read_library(path)
@@ -287,16 +292,17 @@ def rebuild_library(path: Path, videos_dir: Path) -> RebuildResult:
                 metadata = persisted.metadata
                 previous_entry = previous.get(metadata.id, {})
                 previous_tools = list(previous_entry.get("tools") or [])
-                videos.append(
-                    _video_entry(
-                        metadata,
-                        video_dir,
-                        path,
-                        _tool_names_from_artifact(video_dir / "tools.json", previous_tools),
-                        previous_entry.get("created_at") or now,
-                        now,
-                    )
+                entry = _video_entry(
+                    metadata,
+                    video_dir,
+                    path,
+                    _tool_names_from_artifact(video_dir / "tools.json", previous_tools),
+                    previous_entry.get("created_at") or now,
+                    now,
                 )
+                if previous_entry and _same_library_content(previous_entry, entry):
+                    entry["updated_at"] = previous_entry.get("updated_at") or now
+                videos.append(entry)
             except AppError as exc:
                 skipped.append(f"{video_dir.name}: {exc}")
 

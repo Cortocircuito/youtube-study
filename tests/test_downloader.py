@@ -283,6 +283,15 @@ def test_download_subtitles_passes_force_and_quiet_options(monkeypatch, tmp_path
     assert captured["quiet"] is True
     assert captured["no_warnings"] is True
     assert captured["noprogress"] is True
+    assert captured["noplaylist"] is True
+    assert captured["retries"] == 3
+    assert captured["fragment_retries"] == 3
+    assert captured["extractor_retries"] == 3
+    assert captured["file_access_retries"] == 3
+    sleep_functions = captured["retry_sleep_functions"]
+    assert isinstance(sleep_functions, dict)
+    assert set(sleep_functions) == {"http", "fragment", "extractor", "file_access"}
+    assert [sleep_functions["http"](attempt) for attempt in (1, 2, 5)] == [1, 2, 8]
     assert captured["download"] is True
 
 
@@ -310,9 +319,15 @@ def test_download_subtitles_adds_english_as_fallback(monkeypatch, tmp_path: Path
 
 
 def test_download_subtitles_wraps_ytdlp_errors(monkeypatch, tmp_path: Path) -> None:
+    video_dir = tmp_path / "vid"
+    video_dir.mkdir()
+    existing = write_vtt(video_dir, "vid", "es", "subtítulo válido")
+    original = existing.read_bytes()
+    captured: dict[str, object] = {}
+
     class FailingYoutubeDL:
         def __init__(self, opts: dict[str, object]) -> None:
-            pass
+            captured.update(opts)
 
         def __enter__(self) -> "FailingYoutubeDL":
             return self
@@ -329,6 +344,37 @@ def test_download_subtitles_wraps_ytdlp_errors(monkeypatch, tmp_path: Path) -> N
         download_subtitles("https://example.test/video", tmp_path)
 
     assert isinstance(error.value.__cause__, DownloadError)
+    assert captured["overwrites"] is False
+    assert existing.read_bytes() == original
+
+
+@pytest.mark.parametrize(
+    "playlist_info",
+    [
+        {"_type": "playlist"},
+        {"_type": "multi_video"},
+        {"entries": ()},
+        {"entries": object()},
+    ],
+)
+def test_download_subtitles_rejects_playlists(monkeypatch, tmp_path: Path, playlist_info: dict[str, object]) -> None:
+    class PlaylistYoutubeDL:
+        def __init__(self, opts: dict[str, object]) -> None:
+            pass
+
+        def __enter__(self) -> "PlaylistYoutubeDL":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def extract_info(self, url: str, download: bool) -> dict[str, object]:
+            return playlist_info
+
+    monkeypatch.setattr("src.youtube_study.downloader.YoutubeDL", PlaylistYoutubeDL)
+
+    with pytest.raises(SubtitleError, match="playlist"):
+        download_subtitles("https://example.test/playlist", tmp_path)
 
 
 @pytest.mark.parametrize("invalid_info", [None, {}, []])

@@ -14,6 +14,13 @@ from yt_dlp.version import __version__ as YTDLP_VERSION
 from .errors import SubtitleError
 
 MIN_YTDLP_VERSION = (2025, 1, 1)
+DOWNLOAD_RETRIES = 3
+MAX_RETRY_SLEEP_SECONDS = 8
+
+
+def _retry_sleep_seconds(attempt: int) -> int:
+    """Return bounded exponential backoff for yt-dlp retry managers."""
+    return min(2 ** max(attempt - 1, 0), MAX_RETRY_SLEEP_SECONDS)
 
 
 @dataclass(frozen=True)
@@ -76,6 +83,17 @@ def download_subtitles(
         "noprogress": quiet,
         "overwrites": force_download,
         "ignore_no_formats_error": True,
+        "noplaylist": True,
+        "retries": DOWNLOAD_RETRIES,
+        "fragment_retries": DOWNLOAD_RETRIES,
+        "extractor_retries": DOWNLOAD_RETRIES,
+        "file_access_retries": DOWNLOAD_RETRIES,
+        "retry_sleep_functions": {
+            "http": _retry_sleep_seconds,
+            "fragment": _retry_sleep_seconds,
+            "extractor": _retry_sleep_seconds,
+            "file_access": _retry_sleep_seconds,
+        },
     }
     try:
         with YoutubeDL(opts) as ydl:
@@ -87,6 +105,10 @@ def download_subtitles(
         ) from exc
     if not isinstance(info, dict) or not info:
         raise SubtitleError("YouTube no devolvió información para el video solicitado.")
+    if info.get("_type") in {"playlist", "multi_video"} or "entries" in info:
+        raise SubtitleError(
+            "La URL corresponde a una playlist o colección. Proporciona la URL de un video individual para estudiarlo."
+        )
     return info
 
 

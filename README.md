@@ -46,6 +46,9 @@ python app.py study "URL" --quiet
 python app.py study "URL" --force-download
 ```
 
+Las descargas usan reintentos con espera exponencial acotada para errores temporales. Las colecciones
+devueltas por yt-dlp se rechazan explícitamente: proporciona la URL de un video individual.
+
 Biblioteca local:
 
 ```bash

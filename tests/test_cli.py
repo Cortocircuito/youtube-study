@@ -64,12 +64,38 @@ def test_analyze_rejects_info_json_with_inconsistent_id(tmp_path: Path) -> None:
     assert "Traceback" not in result.stderr
 
 
+def test_analyze_malformed_subtitle_returns_domain_error(tmp_path: Path) -> None:
+    video_dir = tmp_path / "videos" / "abc123"
+    video_dir.mkdir(parents=True)
+    (video_dir / "abc123.es.vtt").write_text(
+        "WEBVTT\n\ninvalid --> 00:00:03.000\nTexto con timestamp inválido.\n",
+        encoding="utf-8",
+    )
+    (video_dir / "info.json").write_text(json.dumps({"id": "abc123"}), encoding="utf-8")
+
+    result = run_cli("analyze", "abc123", "--out", str(tmp_path / "videos"))
+
+    assert result.returncode == 1
+    assert "No se pudo analizar el subtítulo seleccionado" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
 def test_help_is_available() -> None:
     result = run_cli("--help")
 
     assert result.returncode == 0
     assert "Descarga transcripciones de YouTube" in result.stdout
     assert "rebuild-library" in result.stdout
+
+
+def test_main_handles_keyboard_interrupt(monkeypatch, capsys) -> None:
+    def interrupted_run(argv: list[str]) -> int:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(cli, "run", interrupted_run)
+
+    assert cli.main() == 130
+    assert "Interrumpido" in capsys.readouterr().err
 
 
 def test_list_and_show_successfully_display_library_entry(tmp_path: Path) -> None:
