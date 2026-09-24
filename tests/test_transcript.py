@@ -1,7 +1,13 @@
 import unittest
 from pathlib import Path
 
-from src.youtube_study.transcript import Cue, chunk_by_minutes, clean_vtt, remove_rolling_overlaps
+from src.youtube_study.transcript import (
+    Cue,
+    chunk_by_minutes,
+    clean_vtt,
+    remove_rolling_overlaps,
+    seconds_from_timestamp,
+)
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sample.vtt"
 
@@ -37,6 +43,11 @@ class TranscriptTests(unittest.TestCase):
                 ("00:20:00", "00:25:00", "Final"),
             ],
         )
+
+    def test_seconds_from_timestamp_rejects_malformed_values(self) -> None:
+        for value in ("invalid", "aa:bb", "00:00:inf"):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "Timestamp inválido"):
+                seconds_from_timestamp(value)
 
 
 if __name__ == "__main__":

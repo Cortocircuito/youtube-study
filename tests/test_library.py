@@ -276,7 +276,7 @@ class LibraryTests(unittest.TestCase):
                         "videos": [
                             {
                                 "id": "demo",
-                                "title": "Anterior",
+                                "title": "Demo",
                                 "path": "videos/demo",
                                 "tools": [],
                                 "created_at": "2025-01-01T00:00:00+00:00",
@@ -294,6 +294,39 @@ class LibraryTests(unittest.TestCase):
             rebuild_library(library_path, root / "videos")
 
             self.assertEqual(load_library(library_path)["videos"][0]["updated_at"], updated_at)
+
+    def test_rebuild_refreshes_updated_at_when_artifact_content_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            library_path = root / "library.json"
+            previous_updated_at = "2025-02-01T00:00:00+00:00"
+            current_updated_at = "2026-09-24T00:00:00+00:00"
+            library_path.write_text(
+                json.dumps(
+                    {
+                        "videos": [
+                            {
+                                "id": "demo",
+                                "title": "Anterior",
+                                "path": "videos/demo",
+                                "tools": [],
+                                "updated_at": previous_updated_at,
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            video_dir = root / "videos" / "demo"
+            video_dir.mkdir(parents=True)
+            (video_dir / "info.json").write_text(json.dumps({"id": "demo", "title": "Actualizado"}), encoding="utf-8")
+
+            with patch("src.youtube_study.library.utc_now", return_value=current_updated_at):
+                rebuild_library(library_path, root / "videos")
+
+            rebuilt = load_library(library_path)["videos"][0]
+            self.assertEqual(rebuilt["title"], "Actualizado")
+            self.assertEqual(rebuilt["updated_at"], current_updated_at)
 
 
 if __name__ == "__main__":

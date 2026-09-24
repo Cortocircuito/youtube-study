@@ -16,9 +16,14 @@ def seconds_from_timestamp(ts: str) -> int:
     parts = ts.split(":")
     if len(parts) == 3:
         h, m, s = parts
-    else:
+    elif len(parts) == 2:
         h, m, s = "0", parts[0], parts[1]
-    return int(h) * 3600 + int(m) * 60 + int(float(s))
+    else:
+        raise ValueError(f"Timestamp inválido: {ts}")
+    try:
+        return int(h) * 3600 + int(m) * 60 + int(float(s))
+    except (OverflowError, ValueError) as exc:
+        raise ValueError(f"Timestamp inválido: {ts}") from exc
 
 
 def timestamp_from_seconds(total: int) -> str:

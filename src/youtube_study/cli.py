@@ -201,6 +201,6 @@ def main() -> int:
     except KeyboardInterrupt:
         print("Interrumpido.", file=sys.stderr)
         return 130
-    except (AppError, OSError, ValueError) as exc:
+    except (AppError, OSError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1

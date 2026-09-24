@@ -51,7 +51,10 @@ def requested_languages(languages: str) -> list[str]:
 
 
 def _analyze_subtitle(subtitle: SubtitleSelection) -> AnalysisResult:
-    result = analyze_cues(clean_vtt(subtitle.path))
+    try:
+        result = analyze_cues(clean_vtt(subtitle.path))
+    except ValueError as exc:
+        raise VideoDataError(f"No se pudo analizar el subtítulo seleccionado: {subtitle.path}") from exc
     if not result.cues:
         raise VideoDataError(f"El subtítulo seleccionado no contiene texto utilizable: {subtitle.path}")
     return result

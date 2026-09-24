@@ -46,6 +46,24 @@ def write_demo_vtt(path: Path) -> None:
     )
 
 
+def test_analysis_value_error_is_reported_as_video_data_error(monkeypatch, tmp_path: Path) -> None:
+    video_dir = tmp_path / "videos" / "demo"
+    video_dir.mkdir(parents=True)
+    subtitle_path = video_dir / "demo.es.vtt"
+    write_demo_vtt(subtitle_path)
+    selection = SubtitleSelection(subtitle_path, "es", "manual", "selección de prueba")
+
+    def invalid_analysis(cues: object) -> object:
+        raise ValueError("evidencia inconsistente")
+
+    monkeypatch.setattr("src.youtube_study.service.analyze_cues", invalid_analysis)
+
+    with pytest.raises(VideoDataError, match="No se pudo analizar") as error:
+        generate_study_files(VideoMetadata("demo", "Demo"), video_dir, selection, tmp_path / "library.json")
+
+    assert isinstance(error.value.__cause__, ValueError)
+
+
 def test_generate_study_files_writes_all_artifacts_from_one_analysis(tmp_path: Path) -> None:
     video_dir = tmp_path / "videos" / "demo"
     video_dir.mkdir(parents=True)

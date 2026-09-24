@@ -12,6 +12,7 @@ La aplicación funciona localmente sin Ollama y permite:
 - Regenerar análisis antiguos al formato v3 sin red cuando los subtítulos ya están guardados.
 - Propagar evidencia extractiva con posiciones y rangos exactos desde los captions hasta preguntas y tarjetas.
 - Publicar generaciones y exportaciones desde staging mediante reemplazos atómicos por archivo y reintento explícito.
+- Reintentar con espera exponencial los fallos temporales de descarga y rechazar colecciones de videos.
 - Leer la biblioteca sin efectos secundarios y reconstruir índices dañados explícitamente con respaldo mediante `rebuild-library`.
 - Validar cambios mediante Ruff, compilación, pytest y GitHub Actions.
 - Medir cobertura de ramas en CI con un umbral global mínimo de 88 %. La referencia local actual es 91 %, incluyendo los subprocesos de las pruebas funcionales de CLI.
@@ -20,9 +21,8 @@ La aplicación funciona localmente sin Ollama y permite:
 
 1. Completar la anotación humana de la muestra local de videos largos descrita en `QUALITY.md`.
 2. Mejorar filtros de biblioteca por canal, herramienta, tema y estado de estudio.
-3. Reforzar reintentos ante fallos temporales de descarga sin sobrescribir resultados válidos.
-4. Mejorar la separación de párrafos con fixtures variados sin reducir la fidelidad extractiva.
-5. Ampliar ramas restantes de biblioteca y metadata sin reducir el umbral global actual.
+3. Mejorar la separación de párrafos con fixtures variados sin reducir la fidelidad extractiva.
+4. Ampliar ramas restantes de biblioteca y metadata sin reducir el umbral global actual.
 
 La fase inicial de evaluación ya dispone de objetivos manuales sobre fixtures sanitizados, métricas direccionales y una muestra local de videos largos pendiente de anotación humana. Esta muestra no participa en CI ni convierte resultados generados en referencias de calidad.
 
