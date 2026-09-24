@@ -438,6 +438,7 @@ def test_process_video_passes_download_options_and_generates_selected_video(monk
     monkeypatch.setattr("src.youtube_study.service.download_subtitles", fake_download)
     monkeypatch.setattr("src.youtube_study.service.choose_subtitle", fake_choose)
     monkeypatch.setattr("src.youtube_study.service.generate_study_files", fake_generate)
+    monkeypatch.setattr("src.youtube_study.service.detect_source_language", lambda url: None)
 
     result = process_video(
         "https://example.test/demo",
@@ -467,6 +468,57 @@ def test_process_video_passes_download_options_and_generates_selected_video(monk
         webpage_url="https://example.test/demo",
     )
     assert generated[1:] == (video_dir, selection, tmp_path / "library.json")
+
+
+@pytest.mark.parametrize(
+    ("detected", "expected"), [("es", "es"), ("en", "en"), ("fr", "es-419, es"), (None, "es-419, es")]
+)
+def test_process_video_downloads_single_detected_language(
+    monkeypatch, tmp_path: Path, detected: str | None, expected: str
+) -> None:
+    out = tmp_path / "videos"
+    video_dir = out / "demo"
+    selection = SubtitleSelection(video_dir / "demo.es.vtt", "es", "manual", "test")
+    calls: dict[str, object] = {}
+
+    def fake_download(
+        url: str,
+        target: Path,
+        languages: str,
+        *,
+        force_download: bool,
+        quiet: bool,
+    ) -> dict[str, object]:
+        calls["download"] = languages
+        return {"id": "demo", "title": "Demo"}
+
+    def fake_choose(
+        target: Path,
+        video_id: str,
+        languages: list[str],
+        info: dict[str, object] | None = None,
+    ) -> SubtitleSelection:
+        calls["choose"] = languages
+        return selection
+
+    def fake_generate(
+        metadata: VideoMetadata,
+        target: Path,
+        selected: SubtitleSelection,
+        library_path: Path,
+    ) -> Path:
+        return target
+
+    monkeypatch.setattr("src.youtube_study.service.download_subtitles", fake_download)
+    monkeypatch.setattr("src.youtube_study.service.choose_subtitle", fake_choose)
+    monkeypatch.setattr("src.youtube_study.service.generate_study_files", fake_generate)
+    monkeypatch.setattr("src.youtube_study.service.detect_source_language", lambda url: detected)
+
+    result = process_video("https://example.test/demo", out, "es-419, es")
+
+    assert result == video_dir
+    assert calls["download"] == expected
+    assert calls["choose"] == ["es-419", "es"]
 
 
 def test_load_existing_video_reports_missing_directory_and_info(tmp_path: Path) -> None:

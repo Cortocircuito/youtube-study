@@ -9,6 +9,7 @@ from yt_dlp.utils import DownloadError
 from src.youtube_study.downloader import (
     SubtitleError,
     choose_subtitle,
+    detect_source_language,
     download_subtitles,
     subtitle_inventory,
     warn_if_outdated_ytdlp,
@@ -295,7 +296,7 @@ def test_download_subtitles_passes_force_and_quiet_options(monkeypatch, tmp_path
     assert captured["download"] is True
 
 
-def test_download_subtitles_adds_english_as_fallback(monkeypatch, tmp_path: Path) -> None:
+def test_download_subtitles_requests_exactly_the_requested_languages(monkeypatch, tmp_path: Path) -> None:
     captured: dict[str, object] = {}
 
     class FakeYoutubeDL:
@@ -315,7 +316,67 @@ def test_download_subtitles_adds_english_as_fallback(monkeypatch, tmp_path: Path
 
     download_subtitles("https://example.test/video", tmp_path, "es-419,es")
 
-    assert captured["subtitleslangs"] == ["es-419", "es", "en.*"]
+    assert captured["subtitleslangs"] == ["es-419", "es"]
+
+
+def test_detect_source_language_returns_base_language(monkeypatch) -> None:
+    class FakeYoutubeDL:
+        def __init__(self, opts: dict[str, object]) -> None:
+            pass
+
+        def __enter__(self) -> "FakeYoutubeDL":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def extract_info(self, url: str, download: bool) -> dict[str, object]:
+            assert download is False
+            return {"id": "vid", "language": "en-US"}
+
+    monkeypatch.setattr("src.youtube_study.downloader.YoutubeDL", FakeYoutubeDL)
+
+    assert detect_source_language("https://example.test/video") == "en"
+
+
+@pytest.mark.parametrize("language", [None, "", 42, "es-419"])
+def test_detect_source_language_handles_unexpected_values(monkeypatch, language: object) -> None:
+    class FakeYoutubeDL:
+        def __init__(self, opts: dict[str, object]) -> None:
+            pass
+
+        def __enter__(self) -> "FakeYoutubeDL":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def extract_info(self, url: str, download: bool) -> dict[str, object]:
+            return {"id": "vid", "language": language}
+
+    monkeypatch.setattr("src.youtube_study.downloader.YoutubeDL", FakeYoutubeDL)
+
+    expected = "es" if language == "es-419" else None
+    assert detect_source_language("https://example.test/video") == expected
+
+
+def test_detect_source_language_returns_none_on_download_error(monkeypatch) -> None:
+    class FailingYoutubeDL:
+        def __init__(self, opts: dict[str, object]) -> None:
+            pass
+
+        def __enter__(self) -> "FailingYoutubeDL":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def extract_info(self, url: str, download: bool) -> dict[str, object]:
+            raise DownloadError("fallo temporal")
+
+    monkeypatch.setattr("src.youtube_study.downloader.YoutubeDL", FailingYoutubeDL)
+
+    assert detect_source_language("https://example.test/video") is None
 
 
 def test_download_subtitles_reuses_partial_vtt_when_fallback_language_fails(monkeypatch, tmp_path: Path) -> None:

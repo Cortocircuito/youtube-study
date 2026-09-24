@@ -78,6 +78,29 @@ def _recover_partial_download(url: str, out_dir: Path, exc: Exception) -> dict[s
     return info
 
 
+def detect_source_language(url: str) -> str | None:
+    """Detect the video's original language with a metadata-only request (no subtitles)."""
+    opts: dict[str, Any] = {
+        "skip_download": True,
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        "ignore_no_formats_error": True,
+        "retries": DOWNLOAD_RETRIES,
+    }
+    try:
+        with YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+    except DownloadError:
+        return None
+    if not isinstance(info, dict):
+        return None
+    language = info.get("language")
+    if isinstance(language, str) and language.strip():
+        return _language_base(language.strip())
+    return None
+
+
 def download_subtitles(
     url: str,
     out_dir: Path,
@@ -91,8 +114,6 @@ def download_subtitles(
     out_dir.mkdir(parents=True, exist_ok=True)
     requested_languages = [x.strip() for x in langs.split(",") if x.strip()]
     download_languages = list(requested_languages)
-    if not any(_language_base(language) == "en" for language in download_languages):
-        download_languages.append("en.*")
     opts = {
         "skip_download": True,
         "writesubtitles": True,

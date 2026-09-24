@@ -4,7 +4,7 @@ from pathlib import Path
 
 from .analyzer import analyze_cues
 from .artifacts import publish_artifacts, staging_directory
-from .downloader import SubtitleSelection, choose_subtitle, download_subtitles
+from .downloader import SubtitleSelection, choose_subtitle, detect_source_language, download_subtitles
 from .errors import VideoDataError
 from .exporter import (
     write_anki_csv,
@@ -48,6 +48,14 @@ GENERATED_ARTIFACTS = (
 
 def requested_languages(languages: str) -> list[str]:
     return [language.strip() for language in languages.split(",") if language.strip()]
+
+
+def download_languages_for(url: str, languages: str) -> str:
+    """Pick a single download language (es/en) from the video's original language when known."""
+    detected = detect_source_language(url)
+    if detected in ("es", "en"):
+        return detected
+    return languages
 
 
 def _analyze_subtitle(subtitle: SubtitleSelection) -> AnalysisResult:
@@ -96,7 +104,9 @@ def generate_study_files(
 
 
 def process_video(url: str, out: Path, languages: str, *, force_download: bool = False, quiet: bool = False) -> Path:
-    info = download_subtitles(url, out, languages, force_download=force_download, quiet=quiet)
+    info = download_subtitles(
+        url, out, download_languages_for(url, languages), force_download=force_download, quiet=quiet
+    )
     metadata = metadata_from_ytdlp(info)
     video_id = metadata.id
     video_dir = out / video_id
