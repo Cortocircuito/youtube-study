@@ -1,0 +1,634 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Análisis sobre harness engineering y los harnesses construidos sobre Claude Code, Codex, OpenCode y Pi.">
+  <title>Harness Engineering: plataformas, capas duraderas y futuro</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f4f1ea;
+      --surface: #fffdf8;
+      --surface-2: #ebe7dd;
+      --text: #1d2422;
+      --muted: #5d6864;
+      --border: #d5d0c4;
+      --accent: #006b5b;
+      --accent-2: #d66a35;
+      --accent-soft: #dceee8;
+      --good: #16734b;
+      --warn: #a85b13;
+      --risk: #a33b3b;
+      --shadow: 0 18px 45px rgba(40, 47, 43, 0.09);
+      --radius: 18px;
+      --content: 1120px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #111715;
+        --surface: #18201d;
+        --surface-2: #222b27;
+        --text: #edf3ef;
+        --muted: #afbbb5;
+        --border: #35403a;
+        --accent: #67d5bc;
+        --accent-2: #f29a6d;
+        --accent-soft: #173b33;
+        --good: #6fd5a4;
+        --warn: #f1b36f;
+        --risk: #f18b8b;
+        --shadow: 0 18px 45px rgba(0, 0, 0, 0.25);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 28rem),
+        radial-gradient(circle at 100% 18%, color-mix(in srgb, var(--accent-2) 10%, transparent), transparent 26rem),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.65;
+    }
+
+    a { color: var(--accent); text-underline-offset: 3px; }
+    a:hover { text-decoration-thickness: 2px; }
+    code {
+      padding: 0.12rem 0.35rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface-2);
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.9em;
+    }
+
+    .page { width: min(calc(100% - 2rem), var(--content)); margin: 0 auto; }
+
+    header {
+      padding: 5.5rem 0 3.2rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .eyebrow {
+      margin: 0 0 1rem;
+      color: var(--accent);
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    h1 {
+      max-width: 900px;
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(2.7rem, 7vw, 5.7rem);
+      font-weight: 700;
+      letter-spacing: -0.055em;
+      line-height: 0.98;
+    }
+    .lede {
+      max-width: 780px;
+      margin: 1.8rem 0 0;
+      color: var(--muted);
+      font-size: clamp(1.08rem, 2vw, 1.35rem);
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.7rem;
+      margin-top: 1.8rem;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+    .meta span {
+      padding: 0.38rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--surface) 78%, transparent);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 260px;
+      gap: 3rem;
+      padding: 3rem 0 5rem;
+    }
+    main { min-width: 0; }
+    aside { order: 2; }
+    .toc {
+      position: sticky;
+      top: 1.25rem;
+      padding: 1.2rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: color-mix(in srgb, var(--surface) 92%, transparent);
+      box-shadow: var(--shadow);
+    }
+    .toc strong {
+      display: block;
+      margin-bottom: 0.65rem;
+      font-size: 0.75rem;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+    }
+    .toc ol { margin: 0; padding-left: 1.15rem; }
+    .toc li { margin: 0.38rem 0; color: var(--muted); font-size: 0.9rem; }
+    .toc a { color: inherit; text-decoration: none; }
+    .toc a:hover { color: var(--accent); }
+
+    section { margin: 0 0 4rem; scroll-margin-top: 1.5rem; }
+    h2 {
+      margin: 0 0 1.25rem;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(1.9rem, 4vw, 3rem);
+      letter-spacing: -0.035em;
+      line-height: 1.1;
+    }
+    h3 { margin: 2rem 0 0.65rem; font-size: 1.25rem; line-height: 1.3; }
+    p { margin: 0.8rem 0 1rem; }
+    ul, ol { padding-left: 1.35rem; }
+    li { margin: 0.45rem 0; }
+
+    .verdict {
+      padding: 1.8rem;
+      border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+      border-left: 7px solid var(--accent);
+      border-radius: var(--radius);
+      background: var(--accent-soft);
+      box-shadow: var(--shadow);
+      font-size: 1.14rem;
+    }
+    .verdict strong { color: var(--accent); }
+    blockquote {
+      margin: 1.6rem 0;
+      padding: 0.5rem 0 0.5rem 1.3rem;
+      border-left: 4px solid var(--accent-2);
+      color: var(--muted);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 1.28rem;
+    }
+
+    .layers {
+      display: grid;
+      gap: 0.75rem;
+      margin: 1.4rem 0;
+      counter-reset: layer;
+    }
+    .layer {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr);
+      gap: 1rem;
+      align-items: start;
+      padding: 1rem;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface);
+    }
+    .layer::before {
+      counter-increment: layer;
+      content: counter(layer);
+      display: grid;
+      width: 36px;
+      height: 36px;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--accent);
+      color: var(--bg);
+      font-weight: 850;
+    }
+    .layer b { display: block; margin-bottom: 0.15rem; }
+    .layer span { color: var(--muted); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+    }
+    .card {
+      padding: 1.35rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .card h3 { margin-top: 0; }
+    .tag {
+      display: inline-block;
+      margin-bottom: 0.7rem;
+      padding: 0.24rem 0.55rem;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .card ul { margin-bottom: 0; }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin: 1.3rem 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    table { width: 100%; min-width: 800px; border-collapse: collapse; }
+    th, td { padding: 0.9rem 1rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { background: var(--surface-2); font-size: 0.78rem; letter-spacing: 0.07em; text-transform: uppercase; }
+    tr:last-child td { border-bottom: 0; }
+    .score { white-space: nowrap; font-weight: 800; }
+
+    .risk-grid { display: grid; gap: 1rem; }
+    .risk-box { padding: 1.25rem; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); }
+    .risk-box h3 { margin-top: 0; }
+    .risk-box.high { border-left: 7px solid var(--risk); }
+    .risk-box.medium { border-left: 7px solid var(--warn); }
+    .risk-box.low { border-left: 7px solid var(--good); }
+    .risk-box.high h3 { color: var(--risk); }
+    .risk-box.medium h3 { color: var(--warn); }
+    .risk-box.low h3 { color: var(--good); }
+
+    .architecture {
+      margin: 1.4rem 0;
+      padding: 1.4rem;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: #101815;
+      color: #d9eee6;
+      font: 0.91rem/1.55 "SFMono-Regular", Consolas, monospace;
+      white-space: pre;
+      box-shadow: var(--shadow);
+    }
+
+    .checklist {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.7rem;
+      padding: 0;
+      list-style: none;
+    }
+    .checklist li {
+      margin: 0;
+      padding: 0.75rem 0.85rem 0.75rem 2.3rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+      position: relative;
+    }
+    .checklist li::before {
+      content: "✓";
+      position: absolute;
+      left: 0.85rem;
+      color: var(--good);
+      font-weight: 900;
+    }
+
+    .sources { font-size: 0.95rem; }
+    .sources li { margin-bottom: 0.7rem; }
+    footer {
+      padding: 2rem 0 3rem;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    @media (max-width: 900px) {
+      header { padding-top: 3.6rem; }
+      .layout { grid-template-columns: 1fr; }
+      aside { order: -1; }
+      .toc { position: static; }
+      .toc ol { columns: 2; }
+    }
+    @media (max-width: 650px) {
+      .page { width: min(calc(100% - 1.1rem), var(--content)); }
+      .grid, .checklist { grid-template-columns: 1fr; }
+      .toc ol { columns: 1; }
+      .verdict, .card { padding: 1.15rem; }
+    }
+    @media print {
+      :root { color-scheme: light; --bg: #fff; --surface: #fff; --surface-2: #f3f3f3; --text: #111; --muted: #444; --border: #ccc; --accent: #005d50; --accent-soft: #e8f3ef; }
+      body { background: #fff; font-size: 10.5pt; }
+      header { padding: 1.5rem 0; }
+      .layout { display: block; padding-top: 1.5rem; }
+      aside { display: none; }
+      section { break-inside: avoid; margin-bottom: 2rem; }
+      .card, .table-wrap, .verdict { box-shadow: none; }
+      a { color: inherit; }
+      a::after { content: " (" attr(href) ")"; font-size: 0.75em; word-break: break-all; }
+      .toc a::after { content: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="page">
+      <p class="eyebrow">Informe de investigación · Harness Engineering</p>
+      <h1>Qué merece la pena construir sobre Claude Code, Codex, OpenCode y Pi</h1>
+      <p class="lede">Síntesis de seis videos sobre harness engineering, documentación oficial y publicaciones técnicas recientes. El objetivo es separar las capas duraderas de las que las plataformas están convirtiendo en funcionalidades nativas.</p>
+      <div class="meta">
+        <span>Actualizado: 24 de septiembre de 2026</span>
+        <span>Enfoque: coding agents</span>
+        <span>Formato: informe aplicable</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="page layout">
+    <main>
+      <section id="tesis">
+        <h2>La tesis en una frase</h2>
+        <div class="verdict">
+          <strong>El harness engineering no tiene los días contados; los wrappers genéricos sí.</strong>
+          Claude Code, Codex, OpenCode y Pi ya son harnesses. Construir otra capa encima solo tiene sentido cuando aporta conocimiento, controles o feedback específicos que el producto base no puede conocer.
+        </div>
+        <p>Las plataformas están absorbiendo memoria, subagentes, permisos, skills, hooks, worktrees, planificación y orquestación. Un sistema cuya única aportación sea crear un agente líder, un implementador, un revisor y un archivo de tareas tiene un riesgo alto de quedar redundante.</p>
+        <blockquote>El activo duradero no es “cómo hago funcionar al agente”, sino “cómo hago que mi entorno sea legible, verificable y seguro para cualquier agente”.</blockquote>
+      </section>
+
+      <section id="capas">
+        <h2>Las cinco capas que solemos confundir</h2>
+        <div class="layers">
+          <div class="layer"><div><b>Modelo</b><span>Claude, GPT, Gemini u otro modelo. Aporta razonamiento, generación y selección de herramientas.</span></div></div>
+          <div class="layer"><div><b>Harness base</b><span>Claude Code, Codex, OpenCode o Pi: loop agéntico, herramientas, sesiones, contexto y permisos.</span></div></div>
+          <div class="layer"><div><b>Harness del repositorio</b><span><code>AGENTS.md</code>, documentación, arquitectura, scripts, tests, CI y convenciones del proyecto.</span></div></div>
+          <div class="layer"><div><b>Harness de la organización</b><span>Tickets, despliegues, observabilidad, seguridad, QA, compliance y revisión.</span></div></div>
+          <div class="layer"><div><b>Meta-harness</b><span>Programas que lanzan agentes, asignan modelos, mantienen memoria y coordinan tareas.</span></div></div>
+        </div>
+        <p>Las plataformas están absorbiendo rápidamente la quinta capa genérica. Las capas tres y cuatro no se pueden generalizar por completo: dependen de tu producto, arquitectura, riesgos y definición de calidad.</p>
+      </section>
+
+      <section id="comparativa">
+        <h2>Comparativa ejecutiva</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Plataforma</th><th>Fortaleza principal</th><th>Construir encima</th><th>Riesgo principal</th><th>Mejor encaje</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><b>Claude Code</b></td><td>Harness muy completo y workflows dinámicos</td><td class="score">Selectivamente</td><td>Duplicar funciones que Anthropic incorpora rápidamente</td><td>Máxima productividad e integración</td></tr>
+              <tr><td><b>Codex</b></td><td>SDK, App Server, sandbox y automatización</td><td class="score">Sí, por API</td><td>Acoplamiento al runtime y ecosistema OpenAI</td><td>Automatización, CI y flujos empresariales</td></tr>
+              <tr><td><b>OpenCode</b></td><td>Abierto, multiproveedor y extensible</td><td class="score">Sí</td><td>Churn de APIs y configuración en un producto joven</td><td>Portabilidad y control</td></tr>
+              <tr><td><b>Pi</b></td><td>Runtime mínimo y profundamente extensible</td><td class="score">Sí, es su propósito</td><td>Debes aportar aislamiento y más infraestructura</td><td>Experimentación y harnesses verticales</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><small>En este informe, “Pi” se refiere al coding agent de <a href="https://pi.dev/">pi.dev</a>.</small></p>
+      </section>
+
+      <section id="plataformas">
+        <h2>Evaluación por plataforma</h2>
+        <div class="grid">
+          <article class="card">
+            <span class="tag">Más completo</span>
+            <h3>Claude Code</h3>
+            <p>Incluye instrucciones persistentes, memoria, skills, hooks, permisos, subagentes, agent teams, background agents, worktrees y Agent SDK.</p>
+            <p>La señal más importante es la aparición de <b>dynamic workflows</b>: Claude puede generar un harness JavaScript específico para cada tarea, con fan-out, verificación adversaria, torneos, routing y bucles.</p>
+            <p><b>Opinión:</b> usa skills, hooks, workflows y SDK oficiales. Evita wrappers que ejecuten la CLI, analicen su texto o reimplementen memoria, permisos y subagentes. Es la plataforma con mayor probabilidad de absorber una innovación externa.</p>
+          </article>
+
+          <article class="card">
+            <span class="tag">Automatización</span>
+            <h3>Codex</h3>
+            <p>Ya ofrece <code>AGENTS.md</code> jerárquico, subagentes, skills, MCP, hooks, plugins, worktrees, SDKs de TypeScript y Python y App Server.</p>
+            <p>El caso interno de OpenAI muestra que el valor no estaba en un prompt mágico: estaba en hacer el repositorio legible, observable y mecánicamente verificable mediante docs, planes, linters, tests y entornos aislados.</p>
+            <p><b>Opinión:</b> construir sobre el SDK o App Server es razonable. Envolver la CLI es frágil. No basaría una diferenciación comercial únicamente en “añadir subagentes a Codex”.</p>
+          </article>
+
+          <article class="card">
+            <span class="tag">Portabilidad</span>
+            <h3>OpenCode</h3>
+            <p>Es abierto y multiproveedor. Incluye agentes declarativos, permisos, subagentes, skills compatibles, plugins, herramientas propias, servidor OpenAPI y SDK tipado.</p>
+            <p><b>Opinión:</b> es el mejor punto medio si buscas neutralidad de modelo sin mantener un agent loop propio. Mantendría la lógica esencial en estándares y ejecutables independientes para reducir el impacto de cambios de versión.</p>
+          </article>
+
+          <article class="card">
+            <span class="tag">Laboratorio</span>
+            <h3>Pi</h3>
+            <p>Expone un loop mínimo, múltiples proveedores, sesiones JSONL en árbol, skills, extensiones TypeScript, RPC y SDK. Permite intervenir en contexto, herramientas, ciclo, estado y UI.</p>
+            <p><b>Opinión:</b> es donde más sentido tiene crear un harness propio, porque esa es su filosofía. Pero Pi no ofrece un sandbox general: las extensiones y herramientas tienen los permisos del proceso. Para ejecución desatendida necesitarás contenedor, VM o sandbox externo.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="multiagente">
+        <h2>El patrón líder–implementador–revisor no es una ley</h2>
+        <p>Los videos lo presentan como un patrón frecuente, pero la información reciente obliga a matizarlo. Anthropic estima que un sistema multiagente suele consumir entre <b>3 y 10 veces más tokens</b> que uno de un solo agente para tareas equivalentes. También ha observado equipos que construyeron arquitecturas complejas y obtuvieron resultados similares mejorando un único agente.</p>
+        <p>Separar por profesiones —planificador, implementador, tester y revisor— puede crear un teléfono roto. Cada traspaso pierde decisiones y obliga a reconstruir contexto.</p>
+        <div class="grid">
+          <div class="card">
+            <h3>Buenas fronteras</h3>
+            <ul>
+              <li>Investigaciones independientes.</li>
+              <li>Componentes con interfaces claras.</li>
+              <li>Análisis de logs separado del código.</li>
+              <li>Verificación de caja negra.</li>
+              <li>Hipótesis competidoras en paralelo.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Fronteras problemáticas</h3>
+            <ul>
+              <li>Planear, implementar y probar la misma feature en agentes distintos.</li>
+              <li>Componentes fuertemente acoplados.</li>
+              <li>Trabajo que exige sincronización continua.</li>
+              <li>Subagentes creados solo porque “más agentes” parece mejor.</li>
+            </ul>
+          </div>
+        </div>
+        <p>El patrón que sí mantiene valor es el <b>verificador independiente</b>: recibe requisitos y artefacto, ejecuta comprobaciones objetivas y dictamina sin necesitar toda la historia de implementación.</p>
+      </section>
+
+      <section id="caducidad">
+        <h2>Qué tiene riesgo real de desaparecer</h2>
+        <div class="risk-grid">
+          <div class="risk-box high">
+            <h3>Alto riesgo de obsolescencia</h3>
+            <ul>
+              <li>Wrappers que invocan una CLI y analizan texto.</li>
+              <li>Sistemas propios de plan mode, memoria conversacional o worktrees paralelos.</li>
+              <li>Orquestadores estáticos de roles.</li>
+              <li>Catálogos propietarios equivalentes a Agent Skills.</li>
+              <li>Capas de aprobación que duplican permisos y hooks nativos.</li>
+            </ul>
+          </div>
+          <div class="risk-box medium">
+            <h3>Riesgo medio</h3>
+            <ul>
+              <li>Plugins muy acoplados a eventos internos.</li>
+              <li>Workflows exclusivos de un proveedor.</li>
+              <li>Configuraciones complejas de hooks.</li>
+              <li>Memoria dependiente del formato interno de sesiones.</li>
+            </ul>
+          </div>
+          <div class="risk-box low">
+            <h3>Bajo riesgo y alto valor</h3>
+            <ul>
+              <li><code>AGENTS.md</code> conciso y Agent Skills estándar.</li>
+              <li>Documentación estructurada y versionada.</li>
+              <li>Tests, linters y políticas ejecutables.</li>
+              <li>Arquitectura con límites verificables.</li>
+              <li>Observabilidad accesible mediante CLI o API.</li>
+              <li>Evals, fixtures y criterios de aceptación.</li>
+              <li>CI independiente del agente utilizado.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="arquitectura">
+        <h2>Arquitectura recomendada para un harness durable</h2>
+        <p>La lógica del negocio y la definición de calidad deberían vivir en el repositorio, no en una plataforma concreta.</p>
+        <div class="architecture" role="img" aria-label="Estructura recomendada del repositorio">Repositorio
+├── AGENTS.md                  # mapa breve, no enciclopedia
+├── docs/                      # conocimiento estructurado
+│   ├── architecture.md
+│   ├── product/
+│   ├── decisions/
+│   └── plans/
+├── .agents/skills/            # skills portables
+├── scripts/                   # acciones reproducibles
+├── tests/                     # criterios ejecutables
+├── architecture-checks/       # invariantes mecánicas
+├── observability/             # CLI/API legible para agentes
+└── CI                         # autoridad final
+
+Adaptadores finos
+├── .claude/                   # solo integración Claude
+├── .codex/                    # solo integración Codex
+├── .opencode/                 # solo integración OpenCode
+└── .pi/                       # solo integración Pi</div>
+        <p>La plataforma es un runtime sustituible. El harness real es el conocimiento, las herramientas y el feedback que permanecen cuando cambias de runtime o modelo.</p>
+      </section>
+
+      <section id="principios">
+        <h2>Principios para aplicarlo en tu harness</h2>
+        <ul class="checklist">
+          <li>Construye el delta, no dupliques el runtime.</li>
+          <li>Empieza con un agente; añade más solo con evidencia.</li>
+          <li>Divide por fronteras de contexto, no por cargos.</li>
+          <li>Haz que la verificación sea ejecutable.</li>
+          <li>Usa progressive disclosure para el contexto.</li>
+          <li>Mantén <code>AGENTS.md</code> como mapa corto.</li>
+          <li>Convierte feedback repetido en tests o linters.</li>
+          <li>Expón UI, logs, métricas y trazas al agente.</li>
+          <li>Prefiere estándares y formatos portables.</li>
+          <li>Aísla tareas de escritura con worktrees o sandboxes.</li>
+          <li>Mide tiempo humano, coste, calidad y regresiones.</li>
+          <li>Elimina periódicamente personalización innecesaria.</li>
+        </ul>
+      </section>
+
+      <section id="modelos">
+        <h2>Por qué un modelo mejor no elimina el harness</h2>
+        <p>Un modelo más capaz reduce las instrucciones necesarias, pero no puede adivinar qué significa “correcto” para tu negocio, qué riesgos son inaceptables, cómo ejecutar tu aplicación, dónde encontrar logs o qué prueba demuestra que una tarea terminó.</p>
+        <p>Incluso un modelo excelente necesita:</p>
+        <ol>
+          <li>objetivos y restricciones;</li>
+          <li>acceso al entorno;</li>
+          <li>límites de actuación;</li>
+          <li>información observable;</li>
+          <li>criterios de éxito.</li>
+        </ol>
+        <blockquote>El harness del futuro tendrá menos “prompt sobre cómo programar” y más infraestructura que define y demuestra resultados.</blockquote>
+      </section>
+
+      <section id="productividad">
+        <h2>Productividad: evidencia todavía incompleta</h2>
+        <p>El estudio de METR de 2025 encontró que 16 mantenedores experimentados tardaron un 19% más con herramientas de IA, aunque creían haber sido más rápidos. Sin embargo, METR actualizó su evaluación en febrero de 2026: considera aquel resultado histórico y sus datos posteriores apuntan a una posible mejora, pero con sesgos de selección e intervalos demasiado amplios para una conclusión firme.</p>
+        <p>La lectura responsable es que la productividad depende del tipo de tarea, experiencia, madurez del repositorio y calidad del harness. Las percepciones personales y los benchmarks aislados no bastan.</p>
+      </section>
+
+      <section id="evaluacion">
+        <h2>La prueba semestral</h2>
+        <p>Cada seis meses compara la plataforma limpia con tu harness completo usando un conjunto de tareas reales.</p>
+        <div class="grid">
+          <div class="card">
+            <h3>A. Baseline</h3>
+            <p>Claude Code, Codex, OpenCode o Pi con configuración mínima y sin orquestación personalizada.</p>
+          </div>
+          <div class="card">
+            <h3>B. Tu harness</h3>
+            <p>La misma plataforma con reglas, skills, hooks, memoria, herramientas y agentes personalizados.</p>
+          </div>
+        </div>
+        <h3>Métricas recomendadas</h3>
+        <ul class="checklist">
+          <li>Tareas completadas correctamente.</li>
+          <li>Intervenciones humanas necesarias.</li>
+          <li>Tiempo humano activo y tiempo total.</li>
+          <li>Tokens y coste económico.</li>
+          <li>Tests, regresiones y rollbacks.</li>
+          <li>Archivos modificados innecesariamente.</li>
+          <li>Calidad y tiempo de revisión del PR.</li>
+          <li>Recuperación después de compactación.</li>
+        </ul>
+        <p>Si la personalización no mejora claramente estas métricas, simplifícala o elimínala. La complejidad del harness debe ganarse su existencia.</p>
+      </section>
+
+      <section id="decision">
+        <h2>Decisión práctica</h2>
+        <div class="grid">
+          <div class="card"><h3>Productividad inmediata</h3><p><b>Claude Code o Codex</b>, usando sus extensiones oficiales en lugar de un orquestador externo.</p></div>
+          <div class="card"><h3>Neutralidad de modelo</h3><p><b>OpenCode</b>, con conocimiento y validación en formatos portables.</p></div>
+          <div class="card"><h3>Investigación de harnesses</h3><p><b>Pi</b>, aceptando que tendrás que resolver aislamiento, seguridad y más infraestructura.</p></div>
+          <div class="card"><h3>Empresa multiproveedor</h3><p>Un núcleo portable en el repositorio y adaptadores finos para cada runtime.</p></div>
+        </div>
+        <div class="verdict" style="margin-top: 1.4rem">
+          <strong>Conclusión:</strong> el futuro no es un gran harness universal encima de Claude Code o Codex. Es un repositorio preparado para agentes, con una capa fina de integración para el runtime que uses hoy.
+        </div>
+      </section>
+
+      <section id="fuentes" class="sources">
+        <h2>Fuentes</h2>
+        <ol>
+          <li><a href="https://openai.com/index/harness-engineering/">OpenAI — Harness engineering: leveraging Codex in an agent-first world</a></li>
+          <li><a href="https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents">Anthropic — Effective harnesses for long-running agents</a></li>
+          <li><a href="https://claude.com/blog/a-harness-for-every-task-dynamic-workflows-in-claude-code">Claude Code — A harness for every task</a></li>
+          <li><a href="https://claude.com/blog/building-multi-agent-systems-when-and-how-to-use-them">Anthropic — Building multi-agent systems: when and how to use them</a></li>
+          <li><a href="https://www.anthropic.com/engineering/building-effective-agents">Anthropic — Building effective agents</a></li>
+          <li><a href="https://developers.openai.com/codex/">OpenAI Developers — Codex documentation</a></li>
+          <li><a href="https://opencode.ai/docs/">OpenCode documentation</a></li>
+          <li><a href="https://pi.dev/docs/latest">Pi documentation</a></li>
+          <li><a href="https://agents.md/">AGENTS.md — formato abierto de instrucciones</a></li>
+          <li><a href="https://agentskills.io/">Agent Skills — estándar abierto</a></li>
+          <li><a href="https://metr.org/blog/2026-02-24-uplift-update/">METR — actualización del estudio de productividad (febrero de 2026)</a></li>
+          <li><a href="https://research.trychroma.com/context-rot">Chroma — Context Rot</a></li>
+        </ol>
+        <p>La síntesis también incorpora los materiales locales generados a partir de seis videos sobre harness engineering almacenados en <code>data/videos/</code>.</p>
+      </section>
+    </main>
+
+    <aside>
+      <nav class="toc" aria-label="Índice del informe">
+        <strong>Contenido</strong>
+        <ol>
+          <li><a href="#tesis">Tesis</a></li>
+          <li><a href="#capas">Cinco capas</a></li>
+          <li><a href="#comparativa">Comparativa</a></li>
+          <li><a href="#plataformas">Plataformas</a></li>
+          <li><a href="#multiagente">Multiagente</a></li>
+          <li><a href="#caducidad">Riesgo de caducidad</a></li>
+          <li><a href="#arquitectura">Arquitectura</a></li>
+          <li><a href="#principios">Principios</a></li>
+          <li><a href="#modelos">Modelos mejores</a></li>
+          <li><a href="#productividad">Productividad</a></li>
+          <li><a href="#evaluacion">Prueba semestral</a></li>
+          <li><a href="#decision">Decisión práctica</a></li>
+          <li><a href="#fuentes">Fuentes</a></li>
+        </ol>
+      </nav>
+    </aside>
+  </div>
+
+  <footer>
+    <div class="page">Informe autónomo, sin dependencias externas. Preparado para consulta, impresión o exportación a PDF.</div>
+  </footer>
+</body>
+</html>
