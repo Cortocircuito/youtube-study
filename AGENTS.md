@@ -56,10 +56,7 @@ python app.py export VIDEO_ID --format markdown|anki|all
 Validación local equivalente a CI:
 
 ```bash
-python app.py --help
-python -m ruff check .
-python -m py_compile app.py src/youtube_study/*.py
-python -m pytest
+./scripts/check.sh
 ```
 
 ## Estructura
@@ -96,14 +93,14 @@ PLAN.md                          # roadmap futuro del proyecto
 - Preguntas y flashcards deben conservar respuesta extractiva, timestamp y extracto fuente; no reintroducir respuestas placeholder.
 - Los exportadores deben degradar a timestamp legible cuando `webpage_url` no exista.
 - Los cambios incompatibles en artefactos deben incrementar `ANALYSIS_FORMAT_VERSION` y permitir regeneración local mediante `analyze`.
-- Después de cambios en código Python, ejecutar `python -m ruff check .`, `python -m py_compile app.py src/youtube_study/*.py` y `python -m pytest`.
+- Después de cambios en código Python, ejecutar `./scripts/check.sh`.
 - La CI no debe descargar videos, leer datos reales de `data/`, ni usar Ollama, API keys o red; usar fixtures pequeños en `tests/`.
 
 ## Prioridades actuales
 
 1. Mejorar la limpieza de subtítulos automáticos ruidosos con fixtures variados.
 2. Refinar la utilidad pedagógica de preguntas y conceptos sin introducir sesgos de dominio.
-3. Ampliar cobertura de tests de los módulos críticos sin imponer umbral hasta medir la situación.
+3. Ampliar cobertura de tests de los módulos críticos manteniendo el umbral global actual.
 4. Mantener compatibilidad de regeneración entre versiones de análisis.
 5. Evaluar exportación PDF y búsqueda semántica solo después de estabilizar el flujo local.
 
