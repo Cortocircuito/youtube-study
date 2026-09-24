@@ -294,7 +294,7 @@ def rebuild_library(path: Path, videos_dir: Path) -> RebuildResult:
                         path,
                         _tool_names_from_artifact(video_dir / "tools.json", previous_tools),
                         previous_entry.get("created_at") or now,
-                        now,
+                        previous_entry.get("updated_at") or now,
                     )
                 )
             except AppError as exc:

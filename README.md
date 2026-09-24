@@ -46,6 +46,9 @@ python app.py study "URL" --quiet
 python app.py study "URL" --force-download
 ```
 
+Las descargas usan reintentos para errores temporales. Las URLs de playlists se rechazan explícitamente:
+proporciona la URL de un video individual.
+
 Biblioteca local:
 
 ```bash

@@ -265,6 +265,36 @@ class LibraryTests(unittest.TestCase):
 
             self.assertEqual(load_library(library_path)["videos"][0]["created_at"], created_at)
 
+    def test_rebuild_preserves_updated_at_from_valid_previous_entry(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            library_path = root / "library.json"
+            updated_at = "2025-02-01T00:00:00+00:00"
+            library_path.write_text(
+                json.dumps(
+                    {
+                        "videos": [
+                            {
+                                "id": "demo",
+                                "title": "Anterior",
+                                "path": "videos/demo",
+                                "tools": [],
+                                "created_at": "2025-01-01T00:00:00+00:00",
+                                "updated_at": updated_at,
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            video_dir = root / "videos" / "demo"
+            video_dir.mkdir(parents=True)
+            (video_dir / "info.json").write_text(json.dumps({"id": "demo", "title": "Demo"}), encoding="utf-8")
+
+            rebuild_library(library_path, root / "videos")
+
+            self.assertEqual(load_library(library_path)["videos"][0]["updated_at"], updated_at)
+
 
 if __name__ == "__main__":
     unittest.main()

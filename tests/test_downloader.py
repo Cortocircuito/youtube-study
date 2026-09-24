@@ -283,6 +283,9 @@ def test_download_subtitles_passes_force_and_quiet_options(monkeypatch, tmp_path
     assert captured["quiet"] is True
     assert captured["no_warnings"] is True
     assert captured["noprogress"] is True
+    assert captured["noplaylist"] is True
+    assert captured["retries"] == 3
+    assert captured["fragment_retries"] == 3
     assert captured["download"] is True
 
 
@@ -329,6 +332,27 @@ def test_download_subtitles_wraps_ytdlp_errors(monkeypatch, tmp_path: Path) -> N
         download_subtitles("https://example.test/video", tmp_path)
 
     assert isinstance(error.value.__cause__, DownloadError)
+
+
+@pytest.mark.parametrize("playlist_info", [{"_type": "playlist"}, {"entries": []}])
+def test_download_subtitles_rejects_playlists(monkeypatch, tmp_path: Path, playlist_info: dict[str, object]) -> None:
+    class PlaylistYoutubeDL:
+        def __init__(self, opts: dict[str, object]) -> None:
+            pass
+
+        def __enter__(self) -> "PlaylistYoutubeDL":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def extract_info(self, url: str, download: bool) -> dict[str, object]:
+            return playlist_info
+
+    monkeypatch.setattr("src.youtube_study.downloader.YoutubeDL", PlaylistYoutubeDL)
+
+    with pytest.raises(SubtitleError, match="playlist"):
+        download_subtitles("https://example.test/playlist", tmp_path)
 
 
 @pytest.mark.parametrize("invalid_info", [None, {}, []])

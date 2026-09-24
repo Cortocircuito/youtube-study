@@ -72,6 +72,16 @@ def test_help_is_available() -> None:
     assert "rebuild-library" in result.stdout
 
 
+def test_main_handles_keyboard_interrupt(monkeypatch, capsys) -> None:
+    def interrupted_run(argv: list[str]) -> int:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(cli, "run", interrupted_run)
+
+    assert cli.main() == 130
+    assert "Interrumpido" in capsys.readouterr().err
+
+
 def test_list_and_show_successfully_display_library_entry(tmp_path: Path) -> None:
     videos_dir = tmp_path / "data" / "videos"
     video_dir = videos_dir / "demo"
