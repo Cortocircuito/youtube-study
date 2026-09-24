@@ -318,6 +318,37 @@ def test_download_subtitles_adds_english_as_fallback(monkeypatch, tmp_path: Path
     assert captured["subtitleslangs"] == ["es-419", "es", "en.*"]
 
 
+def test_download_subtitles_reuses_partial_vtt_when_fallback_language_fails(monkeypatch, tmp_path: Path) -> None:
+    video_dir = tmp_path / "vid"
+    video_dir.mkdir()
+    write_vtt(video_dir, "vid", "es", "subtítulo válido")
+
+    calls: list[bool] = []
+
+    class PartialYoutubeDL:
+        def __init__(self, opts: dict[str, object]) -> None:
+            pass
+
+        def __enter__(self) -> "PartialYoutubeDL":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def extract_info(self, url: str, download: bool) -> dict[str, object]:
+            calls.append(download)
+            if download:
+                raise DownloadError("HTTP Error 429 en subtítulo 'en'")
+            return {"id": "vid", "title": "Demo"}
+
+    monkeypatch.setattr("src.youtube_study.downloader.YoutubeDL", PartialYoutubeDL)
+
+    info = download_subtitles("https://example.test/video", tmp_path)
+
+    assert info["id"] == "vid"
+    assert calls == [True, False]
+
+
 def test_download_subtitles_wraps_ytdlp_errors(monkeypatch, tmp_path: Path) -> None:
     video_dir = tmp_path / "vid"
     video_dir.mkdir()

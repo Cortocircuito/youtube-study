@@ -56,6 +56,28 @@ def warn_if_outdated_ytdlp() -> None:
         )
 
 
+def _recover_partial_download(url: str, out_dir: Path, exc: Exception) -> dict[str, Any] | None:
+    """Reuse already-downloaded .vtt files when a subtitle language fails (e.g. 429 on fallback)."""
+    if not list(out_dir.rglob("*.vtt")):
+        return None
+    metadata_opts: dict[str, Any] = {
+        "skip_download": True,
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        "ignore_no_formats_error": True,
+        "retries": DOWNLOAD_RETRIES,
+    }
+    try:
+        with YoutubeDL(metadata_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+    except DownloadError:
+        return None
+    if not isinstance(info, dict) or not info:
+        return None
+    return info
+
+
 def download_subtitles(
     url: str,
     out_dir: Path,
@@ -99,10 +121,12 @@ def download_subtitles(
         with YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
     except DownloadError as exc:
-        raise SubtitleError(
-            "No se pudieron descargar los subtítulos. Comprueba la URL, los idiomas solicitados, "
-            "los límites de YouTube y que yt-dlp esté actualizado en el venv."
-        ) from exc
+        info = _recover_partial_download(url, out_dir, exc)
+        if info is None:
+            raise SubtitleError(
+                "No se pudieron descargar los subtítulos. Comprueba la URL, los idiomas solicitados, "
+                "los límites de YouTube y que yt-dlp esté actualizado en el venv."
+            ) from exc
     if not isinstance(info, dict) or not info:
         raise SubtitleError("YouTube no devolvió información para el video solicitado.")
     if info.get("_type") in {"playlist", "multi_video"} or "entries" in info:
