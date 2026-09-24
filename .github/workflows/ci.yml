@@ -20,24 +20,14 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: requirements-dev.txt
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
 
-      - name: Smoke test CLI
-        run: python app.py --help
-
-      - name: Lint
-        run: python -m ruff check .
-
-      - name: Compile
-        run: python -m py_compile app.py src/youtube_study/*.py
-
-      - name: Test
-        run: |
-          python -m coverage run -m pytest
-          python -m coverage combine
-          python -m coverage report
+      - name: Validate
+        run: ./scripts/check.sh

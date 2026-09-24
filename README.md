@@ -27,10 +27,7 @@ Para ejecutar tests, lint y formato de desarrollo:
 
 ```bash
 pip install -r requirements-dev.txt
-python -m ruff check .
-python -m coverage run -m pytest
-python -m coverage combine
-python -m coverage report
+./scripts/check.sh
 ```
 
 ## Uso
@@ -113,18 +110,15 @@ La evaluación heurística usa un corpus sanitizado y una línea base versionada
 Validación completa:
 
 ```bash
-python -m ruff format --check .
-python -m ruff check .
-python -m py_compile app.py src/youtube_study/*.py
-python -m coverage run -m pytest
-python -m coverage combine
-python -m coverage report
+./scripts/check.sh
 ```
+
+El script valida el CLI, formato, lint, compilación, tests y una cobertura mínima de 88 %.
 
 El skill compartido para resumir videos está versionado en `.pi/skills/video-study-summary/`.
 
 ## Integración continua
 
-GitHub Actions valida cada push y pull request con Python 3.11 mediante instalación limpia, `python app.py --help`, Ruff, compilación y tests. No descarga videos ni usa red durante las pruebas.
+GitHub Actions ejecuta `scripts/check.sh` en cada push y pull request con Python 3.11 y una instalación limpia. No descarga videos ni usa red durante las pruebas.
 
 Ollama, Whisper, GUI, PDF y búsqueda semántica permanecen fuera del alcance actual.

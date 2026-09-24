@@ -14,7 +14,7 @@ La aplicación funciona localmente sin Ollama y permite:
 - Publicar generaciones y exportaciones desde staging mediante reemplazos atómicos por archivo y reintento explícito.
 - Leer la biblioteca sin efectos secundarios y reconstruir índices dañados explícitamente con respaldo mediante `rebuild-library`.
 - Validar cambios mediante Ruff, compilación, pytest y GitHub Actions.
-- Medir cobertura de ramas en CI sin imponer todavía un umbral. La referencia local actual es 91 %, incluyendo los subprocesos de las pruebas funcionales de CLI.
+- Medir cobertura de ramas en CI con un umbral global mínimo de 88 %. La referencia local actual es 91 %, incluyendo los subprocesos de las pruebas funcionales de CLI.
 
 ## Prioridades próximas sin IA
 
@@ -22,7 +22,7 @@ La aplicación funciona localmente sin Ollama y permite:
 2. Mejorar filtros de biblioteca por canal, herramienta, tema y estado de estudio.
 3. Reforzar reintentos ante fallos temporales de descarga sin sobrescribir resultados válidos.
 4. Mejorar la separación de párrafos con fixtures variados sin reducir la fidelidad extractiva.
-5. Ampliar ramas restantes de biblioteca y metadata antes de decidir si conviene fijar un umbral.
+5. Ampliar ramas restantes de biblioteca y metadata sin reducir el umbral global actual.
 
 La fase inicial de evaluación ya dispone de objetivos manuales sobre fixtures sanitizados, métricas direccionales y una muestra local de videos largos pendiente de anotación humana. Esta muestra no participa en CI ni convierte resultados generados en referencias de calidad.
 
