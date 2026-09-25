@@ -331,9 +331,9 @@
     <div class="page">
       <p class="eyebrow">Informe de investigación · Harness Engineering</p>
       <h1>Qué merece la pena construir sobre Claude Code, Codex, OpenCode y Pi</h1>
-      <p class="lede">Síntesis de seis videos sobre harness engineering, documentación oficial y publicaciones técnicas recientes. El objetivo es separar las capas duraderas de las que las plataformas están convirtiendo en funcionalidades nativas.</p>
+      <p class="lede">Síntesis de videos sobre harness engineering, documentación oficial y publicaciones técnicas recientes. El objetivo es separar las capas duraderas de las que las plataformas están convirtiendo en funcionalidades nativas.</p>
       <div class="meta">
-        <span>Actualizado: 24 de septiembre de 2026</span>
+        <span>Actualizado: 25 de septiembre de 2026</span>
         <span>Enfoque: coding agents</span>
         <span>Formato: informe aplicable</span>
       </div>
@@ -507,6 +507,47 @@ Adaptadores finos
         <p>La plataforma es un runtime sustituible. El harness real es el conocimiento, las herramientas y el feedback que permanecen cuando cambias de runtime o modelo.</p>
       </section>
 
+      <section id="operacion">
+        <h2>Diseño operativo: del feedback a la autonomía</h2>
+        <p>Un harness útil no necesita empezar como un sistema autónomo complejo. Conviene escoger el loop más pequeño que resuelva la tarea y aumentar su alcance solo cuando existan verificadores capaces de detectar desviaciones.</p>
+
+        <div class="grid">
+          <article class="card">
+            <span class="tag">Determinismo</span>
+            <h3>Flujo lineal</h3>
+            <p>Entrada → herramienta → respuesta → salida. Es adecuado para clasificar, inspeccionar o transformar cuando el recorrido debe ser predecible y limitado.</p>
+          </article>
+          <article class="card">
+            <span class="tag">Iteración</span>
+            <h3>Loop cerrado</h3>
+            <p>Observar → modificar → verificar → interpretar el fallo → repetir. Es adecuado para código, depuración y tareas cuyo estado final puede comprobarse mecánicamente.</p>
+          </article>
+        </div>
+
+        <h3>Escalera de autonomía</h3>
+        <ol>
+          <li>Empieza con una tarea pequeña y un criterio de aceptación explícito.</li>
+          <li>Haz que tests, linters o verificadores juzguen el resultado.</li>
+          <li>Encadena varios cambios pequeños y mide cuándo aparece la divergencia.</li>
+          <li>Aumenta el tamaño del loop solo si el sistema puede detectar, explicar y corregir fallos.</li>
+          <li>Reserva migraciones, ejecución prolongada y paralelismo para un entorno que ya haya demostrado fiabilidad.</li>
+        </ol>
+        <p>La pregunta práctica no es solamente cuántos agentes utilizar, sino <b>cuántos cambios puede encadenar el sistema antes de necesitar intervención humana</b>.</p>
+
+        <h3>Desplazar el feedback a la izquierda</h3>
+        <p>Una corrección repetida debería convertirse progresivamente en infraestructura reusable:</p>
+        <div class="architecture" role="img" aria-label="Evolución del feedback manual hacia políticas automáticas">Corrección manual
+→ instrucción breve
+→ documentación descubrible
+→ herramienta o script
+→ test o verificador
+→ política automática</div>
+        <p>El objetivo es reducir la dependencia de prompts extensos. El agente debería clasificar la tarea y descubrir bajo demanda la documentación, las skills y las herramientas relevantes, en vez de cargar todo el conocimiento en cada ejecución.</p>
+
+        <h3>Observabilidad diseñada para agentes y humanos</h3>
+        <p>Logs, métricas y trazas deben exponerse mediante CLI o API, con salidas densas, filtrables y reproducibles. La automatización no elimina la necesidad de inspección: cuando el artefacto final es incorrecto, debe ser posible reconstruir qué contexto, decisiones y verificaciones produjeron el desvío.</p>
+      </section>
+
       <section id="principios">
         <h2>Principios para aplicarlo en tu harness</h2>
         <ul class="checklist">
@@ -514,6 +555,8 @@ Adaptadores finos
           <li>Empieza con un agente; añade más solo con evidencia.</li>
           <li>Divide por fronteras de contexto, no por cargos.</li>
           <li>Haz que la verificación sea ejecutable.</li>
+          <li>Escoge entre flujo lineal y loop cerrado según la tarea.</li>
+          <li>Aumenta la autonomía solo después de demostrar fiabilidad.</li>
           <li>Usa progressive disclosure para el contexto.</li>
           <li>Mantén <code>AGENTS.md</code> como mapa corto.</li>
           <li>Convierte feedback repetido en tests o linters.</li>
@@ -600,8 +643,10 @@ Adaptadores finos
           <li><a href="https://agentskills.io/">Agent Skills — estándar abierto</a></li>
           <li><a href="https://metr.org/blog/2026-02-24-uplift-update/">METR — actualización del estudio de productividad (febrero de 2026)</a></li>
           <li><a href="https://research.trychroma.com/context-rot">Chroma — Context Rot</a></li>
+          <li><a href="https://www.youtube.com/watch?v=yg55OIb5op0">Don Woodlock — What Is Harness Engineering?</a></li>
+          <li><a href="https://www.youtube.com/watch?v=F8EZJAm9iO8">Google Cloud Tech — Harness Engineering Explained</a></li>
         </ol>
-        <p>La síntesis también incorpora los materiales locales generados a partir de seis videos sobre harness engineering almacenados en <code>data/videos/</code>.</p>
+        <p>La síntesis también incorpora los materiales locales generados a partir de los videos sobre harness engineering almacenados en <code>data/videos/</code>.</p>
       </section>
     </main>
 
@@ -616,6 +661,7 @@ Adaptadores finos
           <li><a href="#multiagente">Multiagente</a></li>
           <li><a href="#caducidad">Riesgo de caducidad</a></li>
           <li><a href="#arquitectura">Arquitectura</a></li>
+          <li><a href="#operacion">Diseño operativo</a></li>
           <li><a href="#principios">Principios</a></li>
           <li><a href="#modelos">Modelos mejores</a></li>
           <li><a href="#productividad">Productividad</a></li>
